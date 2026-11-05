@@ -1,0 +1,31 @@
+{
+	"name": "allrankings",
+	"private": true,
+	"type": "module",
+	"scripts": {
+		"dev": "vite",
+		"build": "vite build",
+		"check": "svelte-check --tsconfig ./tsconfig.json --fail-on-warnings",
+		"lint": "biome ci . && prettier --check 'src/**/*.svelte' 'src/**/*.scss' index.html .github && stylelint 'src/**/*.scss'"
+	},
+	"devDependencies": {
+		"@biomejs/biome": "2.6.2",
+		"@sveltejs/vite-plugin-svelte": "7.3.1",
+		"prettier": "3.9.10",
+		"prettier-plugin-svelte": "4.1.1",
+		"sass": "1.106.1",
+		"stylelint": "17.16.0",
+		"stylelint-config-standard-scss": "17.0.0",
+		"svelte": "5.57.3",
+		"svelte-check": "4.7.7",
+		"typescript": "6.0.3",
+		"vite": "8.3.5"
+	},
+	"packageManager": "bun@1.4.2",
+	"author": "clareLab <yaho@clarelab.moe>",
+	"dependencies": {
+		"flag-icons": "7.6.0",
+		"hyparquet": "1.32.0",
+		"hyparquet-compressors": "1.1.3"
+	}
+}

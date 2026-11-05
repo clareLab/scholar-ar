@@ -1,0 +1,17 @@
+{
+	"$schema": "https://biomejs.dev/schemas/2.6.2/schema.json",
+	"files": {
+		"includes": ["**/*.ts", "**/*.json", "!dist", "!node_modules"]
+	},
+	"formatter": {
+		"useEditorconfig": true
+	},
+	"assist": {
+		"enabled": true,
+		"actions": {
+			"source": {
+				"organizeImports": "on"
+			}
+		}
+	}
+}
