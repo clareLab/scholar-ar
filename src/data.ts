@@ -19,12 +19,6 @@ export type Node = {
 
 type Branch = [number, string, number];
 
-export type Index = {
-	release: string;
-	years: [number, number];
-	default_years: [number, number];
-};
-
 type Tree = {
 	domains: [number, string][];
 	fields: Branch[];
@@ -32,19 +26,17 @@ type Tree = {
 	topics: Branch[];
 };
 
-export type Institutions = {
+type Institutions = {
 	id: number[];
 	name: string[];
 	country: string[];
-	ror: string[];
 };
 
-export type Venues = { id: number[]; name: string[]; country: string[] };
+type Venues = { id: number[]; name: string[]; country: string[] };
 
 export type People = { a: number[]; name: string[] };
 
 export type Meta = {
-	index: Index;
 	nodes: Map<number, Node>;
 	institutions: Institutions;
 	venues: Venues;
@@ -52,8 +44,11 @@ export type Meta = {
 
 export type Group = Record<string, number[] & number[][]>;
 
-const api: string =
-	import.meta.env.VITE_API || "https://assets.clarelab.moe/allrankings";
+const api = import.meta.env.VITE_API as string;
+
+export const years = [2004, 2025];
+
+export const defaults = [2022, 2025];
 
 const memo = new Map<string, Promise<unknown>>();
 
@@ -62,11 +57,18 @@ const once = <T>(key: string, make: () => Promise<T>) => {
 	if (!hit) {
 		hit = make();
 		memo.set(key, hit);
+		hit.catch(() => memo.delete(key));
 	}
 	return hit as Promise<T>;
 };
 
-export const json = <T>(path: string) =>
+export const forget = (view: string) => {
+	for (const key of memo.keys())
+		if (key.startsWith("views/") && !key.startsWith(`${view}/`))
+			memo.delete(key);
+};
+
+const json = <T>(path: string) =>
 	once(path, () =>
 		fetch(`${api}/${path}`).then((r) => (r.ok ? r.json() : undefined)),
 	) as Promise<T | undefined>;
@@ -75,15 +77,16 @@ type Part = { file: AsyncBuffer; metadata: FileMetaData };
 
 const open = (path: string) =>
 	once(`${path}#`, async (): Promise<Part | undefined> => {
-		try {
-			const file = await asyncBufferFromUrl({ url: `${api}/${path}` });
-			const metadata = await parquetMetadataAsync(file, {
-				initialFetchSize: 8,
-			});
-			return { file, metadata };
-		} catch {
-			return undefined;
-		}
+		const url = `${api}/${path}`;
+		const head = await fetch(url, { headers: { Range: "bytes=0-0" } });
+		if (head.status === 404) return undefined;
+		if (!head.ok) throw new Error(`${head.status} ${path}`);
+		const byteLength = Number(head.headers.get("Content-Range")?.split("/")[1]);
+		const file = await asyncBufferFromUrl({ url, byteLength });
+		const metadata = await parquetMetadataAsync(file, {
+			initialFetchSize: 32768,
+		});
+		return { file, metadata };
 	});
 
 const compressors = { ZSTD: (input: Uint8Array) => decompressZstd(input) };
@@ -91,7 +94,7 @@ const compressors = { ZSTD: (input: Uint8Array) => decompressZstd(input) };
 const plain = (value: unknown): unknown =>
 	typeof value === "bigint" ? Number(value) : value;
 
-export type Stat = (name: string) => [number, number];
+type Stat = (name: string) => [number, number];
 
 export const starts = async (path: string) => {
 	const part = await open(path);
@@ -102,7 +105,7 @@ export const starts = async (path: string) => {
 };
 
 export const read = <T = Group>(path: string, k: number, names?: string[]) =>
-	once(`${path}@${k}`, async () => {
+	once(`${path}@${k} ${names}`, async () => {
 		const part = await open(path);
 		if (!part) return undefined;
 		const { file, metadata } = part;
@@ -131,6 +134,7 @@ export const read = <T = Group>(path: string, k: number, names?: string[]) =>
 export const groups = async <T = Group>(
 	path: string,
 	keep: (stat: Stat) => boolean,
+	names?: string[],
 ) => {
 	const part = await open(path);
 	if (!part) return [];
@@ -142,10 +146,15 @@ export const groups = async <T = Group>(
 			)?.meta_data?.statistics;
 			return [Number(found?.min_value), Number(found?.max_value)];
 		};
-		if (keep(stat)) out.push(read<T>(path, k));
+		if (keep(stat)) out.push(read<T>(path, k, names));
 	});
 	return (await Promise.all(out)) as T[];
 };
+
+export const having = (want: Record<string, number[]>) => (stat: Stat) =>
+	Object.entries(want).every(([name, values]) =>
+		values.includes(stat(name)[0]),
+	);
 
 const grow = (tree: Tree) => {
 	const root: Node = { id: 0, name: "All", level: "all", children: [] };
@@ -166,22 +175,17 @@ const grow = (tree: Tree) => {
 };
 
 export const load = async (): Promise<Meta> => {
-	const index = await json<Index>("index.json");
-	if (!index) throw new Error("index.json");
 	const [tree, institutions, venues] = await Promise.all([
-		json<Tree>(`${index.release}/tree.json`),
-		json<Institutions>(`${index.release}/institutions.json`),
-		json<Venues>(`${index.release}/venues.json`),
+		json<Tree>("tree.json"),
+		json<Institutions>("institutions.json"),
+		json<Venues>("venues.json"),
 	]);
-	if (!tree || !institutions || !venues) throw new Error(index.release);
-	return { index, nodes: grow(tree), institutions, venues };
+	if (!tree || !institutions || !venues) throw new Error(api);
+	return { nodes: grow(tree), institutions, venues };
 };
 
-export const path = (node: Node): Node[] =>
-	node.parent ? [...path(node.parent), node] : [node];
-
-const leaves = (node: Node): Node[] =>
-	node.children.length ? node.children.flatMap(leaves) : [node];
+export const leaves = <T extends { children: T[] }>(twig: T): T[] =>
+	twig.children.length ? twig.children.flatMap(leaves) : [twig];
 
 export const topics = (node: Node, off: number[]) => {
 	const under = new Map<number, number>();
@@ -227,17 +231,120 @@ export const credit = (
 	return sums;
 };
 
-export const total = (
-	files: Group[],
+export const whole = (node: Node, off: Set<number>) =>
+	node.children.length > 0 && node.children.every((c) => !off.has(c.id));
+
+export const ends = (
+	node: Node,
+	file: string,
+	key: string,
+	[from, to]: number[],
+	all: boolean,
+	want = {},
+) => {
+	const split = node.children.length > 0 && !all;
+	const names = split ? ["child", "i", key] : ["i", key];
+	const path = `views/${node.level}/${node.id}/${file}.parquet`;
+	return Promise.all(
+		[to, from - 1].map((year) =>
+			groups(
+				path,
+				(stat) =>
+					having({ ...want, year: [year] })(stat) &&
+					(!node.children.length || (stat("child")[0] === 0) === all),
+				names,
+			),
+		),
+	);
+};
+
+export const stalls = (node: Node, years: number[], all: boolean) =>
+	groups(
+		`views/${node.level}/${node.id}/venues.parquet`,
+		(stat) =>
+			having({ year: years })(stat) &&
+			(!node.children.length || (stat("child")[0] === 0) === all),
+		node.children.length && !all
+			? ["year", "child", "v", "tier", "mass"]
+			: ["year", "v", "tier", "mass"],
+	);
+
+export const tally = (
+	[up, down]: Group[][],
 	size: number,
 	key: string,
-	value: (row: number, group: Group) => number,
+	off: Set<number>,
 ) => {
 	const sums = new Float64Array(size);
-	for (const group of files) {
-		const keys = group[key];
-		for (let r = 0; r < keys.length; r++) sums[keys[r]] += value(r, group);
+	for (const [files, sign] of [
+		[up, 1],
+		[down, -1],
+	] as const)
+		for (const { child, i, [key]: value } of files)
+			for (let r = 0; r < i.length; r++)
+				if (!child || !off.has(child[r])) sums[i[r]] += sign * value[r];
+	return sums;
+};
+
+export const slot = (v: number, year: number) => v * 4096 + year;
+
+export const shelve = (cells: Group[], ids: number[]) => {
+	const tier = new Map<number, number>();
+	const mass = new Map<string, [number, number, number]>();
+	for (const { year, v, tier: t, mass: m } of cells) {
+		for (let r = 0; r < v.length; r++) {
+			tier.set(slot(v[r], year[r]), t[r]);
+			const key = `${t[r]}.${ids[v[r]]}`;
+			const cell = mass.get(key) ?? [t[r], v[r], 0];
+			cell[2] += m[r];
+			mass.set(key, cell);
+		}
 	}
+	const listings = [1, 2, 3, 4].map(
+		(): { key: string; tier: number; v: number }[] => [],
+	);
+	for (const [key, [t, v]] of [...mass].sort(
+		(a, b) => b[1][2] - a[1][2] || a[1][1] - b[1][1],
+	))
+		listings[t - 1].push({ key, tier: t, v });
+	return { tier, mass, listings };
+};
+
+export type Shelf = ReturnType<typeof shelve>;
+
+export const swaps = (
+	shelf: Shelf,
+	flip: string[],
+	chosen: Set<number>,
+	span: number[],
+) =>
+	flip
+		.filter((key) => shelf.mass.has(key))
+		.map((key) => {
+			const [t, v] = shelf.mass.get(key) as [number, number, number];
+			return {
+				key: `${v} ${t}`,
+				sign: chosen.has(t) ? -1 : 1,
+				read: () =>
+					groups(
+						`venue/${v}.parquet`,
+						having({
+							year: span.filter((year) => shelf.tier.get(slot(v, year)) === t),
+						}),
+					),
+			};
+		});
+
+export const count = (
+	counts: Group[][],
+	bundles: { sign: number; files: Group[] }[],
+	under: Map<number, number>,
+	off: Set<number>,
+	size: number,
+) => {
+	const sums = tally(counts, size, "n", off);
+	for (const { sign, files } of bundles)
+		credit(files, under, "i", () => true, sums, sign);
 	return sums;
 };
 

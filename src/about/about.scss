@@ -1,0 +1,451 @@
+$phone: 760px;
+
+@property --pad {
+  syntax: "<length>";
+  inherits: true;
+  initial-value: 0;
+}
+
+.toc {
+  position: sticky;
+  top: var(--bar);
+  height: calc(100vh - var(--bar));
+  overflow-y: auto;
+  overscroll-behavior: contain;
+
+  .langs {
+    display: flex;
+    gap: 1em;
+    padding: 4px 0 5px;
+    white-space: nowrap;
+    border-bottom: 1px solid var(--ink);
+
+    button {
+      color: var(--mute);
+
+      &:hover,
+      &.on {
+        color: var(--ink);
+      }
+    }
+  }
+
+  ol {
+    margin: 0;
+    padding: 6px 1.5em 24px 0;
+    list-style: none;
+  }
+
+  li button {
+    display: block;
+    width: 100%;
+    padding-left: 1.6em;
+    color: var(--mute);
+    text-indent: -1.6em;
+
+    &:hover,
+    &.at {
+      color: var(--ink);
+    }
+  }
+
+  .no {
+    display: inline-block;
+    width: 1.6em;
+    text-indent: 0;
+  }
+
+  .now {
+    display: none;
+  }
+}
+
+.paper {
+  --title: 60px;
+  --pad: calc(var(--rank) + var(--gap));
+  --cover: calc(-1 * var(--pad)) 0 #fff;
+  --stack: calc(var(--bar) + var(--title));
+
+  grid-column: 2;
+  min-width: 0;
+  padding: 0 0 48px var(--pad);
+  hyphens: auto;
+  overflow-wrap: break-word;
+
+  .headline {
+    position: sticky;
+    top: var(--bar);
+    z-index: 2;
+    display: flex;
+    gap: 1em;
+    align-items: baseline;
+    justify-content: space-between;
+    height: var(--title);
+    padding-top: 22px;
+    background: #fff;
+    box-shadow: var(--cover);
+  }
+
+  h1 {
+    font-size: 24px;
+    line-height: 30px;
+  }
+
+  .pdf {
+    flex: none;
+    color: var(--mute);
+
+    &:hover {
+      color: var(--ink);
+    }
+  }
+
+  .by {
+    display: flex;
+    column-gap: 1.5em;
+    justify-content: space-between;
+    padding-bottom: 18px;
+    color: var(--mute);
+
+    > span {
+      display: flex;
+      flex-direction: column;
+    }
+
+    > :first-child {
+      color: var(--ink);
+    }
+
+    > :last-child {
+      align-items: flex-end;
+    }
+  }
+
+  .edge {
+    position: sticky;
+    top: var(--stack);
+    z-index: 2;
+    height: 1px;
+    margin: 0;
+    background: var(--hair);
+    border: 0;
+  }
+
+  h2,
+  h3 {
+    position: relative;
+    margin: 27px 0 6px;
+    padding: 6px 0 5px;
+    font-size: 17px;
+    line-height: var(--line);
+
+    &[data-number]::before {
+      position: absolute;
+      right: calc(100% + 0.6em);
+      font-variant-numeric: tabular-nums;
+      content: attr(data-number);
+    }
+  }
+
+  h3 {
+    margin-top: 16px;
+    font-size: 15px;
+  }
+
+  .part,
+  .sub {
+    scroll-margin-top: calc(var(--stack) + 1px);
+  }
+
+  ul,
+  ol:not(.refs) {
+    margin: 0 0 11px;
+    padding-left: 1.5em;
+  }
+
+  .abstract {
+    margin-top: 16px;
+
+    h2 {
+      margin-top: 0;
+      font-size: 15px;
+    }
+  }
+
+  p {
+    margin: 0 0 11px;
+  }
+
+  &:lang(zh) .part:not(.abstract) p {
+    text-align: justify;
+    text-indent: 2em;
+  }
+
+  a {
+    color: var(--link);
+  }
+
+  .katex {
+    font-size: 1.04em;
+  }
+
+  :is(p, li, figcaption) .katex {
+    display: inline-block;
+    height: 0;
+    line-height: 0;
+  }
+
+  .katex-display {
+    margin: 11px 0;
+    padding: 4px 0;
+    overflow: auto hidden;
+  }
+
+  figure {
+    margin: 33px 0;
+    scroll-margin-top: calc(var(--stack) + 16px);
+  }
+
+  .wide {
+    margin-left: calc(-1 * var(--pad));
+  }
+
+  .code {
+    position: relative;
+    margin: 11px 0;
+
+    pre {
+      margin: 0;
+      overflow-x: auto;
+      font-family: "TeX Gyre Cursor", "Courier New", Courier, monospace;
+      font-size: 14px;
+      line-height: 22px;
+    }
+
+    .copy {
+      position: absolute;
+      top: 0;
+      right: 0;
+      color: var(--mute);
+
+      &:hover {
+        color: var(--ink);
+      }
+    }
+  }
+
+  figcaption {
+    margin-top: 11px;
+    font-size: 14px;
+    line-height: 20px;
+  }
+
+  .label {
+    margin-right: 0.4em;
+    font-weight: bold;
+  }
+
+  .refs {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    counter-reset: ref;
+
+    li {
+      position: relative;
+      margin-bottom: 6px;
+      scroll-margin-top: calc(var(--stack) + 16px);
+      counter-increment: ref;
+
+      &::before {
+        position: absolute;
+        right: calc(100% + 0.6em);
+        content: "[" counter(ref) "]";
+      }
+    }
+  }
+}
+
+.plot {
+  svg {
+    display: block;
+    overflow: visible;
+    font-variant-numeric: tabular-nums;
+    touch-action: pan-y;
+  }
+
+  .controls {
+    display: flex;
+    gap: 1.5em;
+    align-items: baseline;
+    min-height: var(--line);
+    margin-bottom: 8px;
+    font-size: 14px;
+  }
+
+  .switch {
+    display: flex;
+    flex: none;
+    gap: 1em;
+
+    button {
+      color: var(--mute);
+
+      &:hover,
+      &.on {
+        color: var(--ink);
+      }
+    }
+  }
+
+  .readout {
+    display: flex;
+    flex: 1;
+    justify-content: flex-end;
+    min-width: 0;
+    overflow: hidden;
+    color: var(--mute);
+    white-space: nowrap;
+
+    .name {
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    > span:last-child {
+      flex: none;
+    }
+  }
+
+  .slide {
+    display: flex;
+    flex: none;
+    gap: 0.6em;
+    align-items: center;
+    color: var(--mute);
+    cursor: pointer;
+
+    sub {
+      line-height: 0;
+    }
+  }
+
+  input[type="range"] {
+    width: 7em;
+    height: 14px;
+    background: linear-gradient(var(--ink), var(--ink)) center / 100% 1px
+      no-repeat;
+    cursor: pointer;
+
+    &::-webkit-slider-thumb {
+      width: 9px;
+      height: 9px;
+      background: var(--ink);
+      border-radius: 50%;
+      appearance: none;
+    }
+
+    &::-moz-range-thumb {
+      width: 9px;
+      height: 9px;
+      background: var(--ink);
+      border: 0;
+      border-radius: 50%;
+    }
+  }
+}
+
+@media (width < $phone) {
+  .toc {
+    position: static;
+    display: flex;
+    flex-wrap: wrap;
+    column-gap: 1.5em;
+    height: auto;
+    padding: 6px 0 5px;
+    overflow: visible;
+    border-bottom: 1px solid var(--hair);
+
+    .langs {
+      order: 1;
+      padding: 0;
+      border: 0;
+    }
+
+    .now {
+      display: block;
+      flex: 1;
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    ol {
+      flex-basis: 100%;
+      order: 2;
+      max-height: 50vh;
+      padding: 6px 0 0;
+      overflow-y: auto;
+    }
+
+    &.shut ol {
+      display: none;
+    }
+  }
+
+  .paper {
+    --title: 46px;
+    --pad: 0px;
+
+    grid-column: 1;
+    padding: 0 0 40px;
+
+    .headline {
+      padding-top: 14px;
+    }
+
+    h1 {
+      font-size: 20px;
+      line-height: 26px;
+    }
+
+    h2,
+    h3 {
+      &[data-number]::before {
+        position: static;
+        margin-right: 0.6em;
+      }
+    }
+
+    .wide {
+      margin-left: 0;
+    }
+
+    .refs li {
+      padding-left: 2.2em;
+
+      &::before {
+        right: auto;
+        left: 0;
+      }
+    }
+  }
+
+  .plot .controls {
+    flex-wrap: wrap;
+    row-gap: 2px;
+  }
+
+  .plot .readout {
+    display: block;
+    flex-basis: 100%;
+    height: calc(3 * var(--line));
+    white-space: normal;
+
+    .name {
+      overflow: visible;
+    }
+  }
+}

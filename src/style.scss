@@ -59,8 +59,7 @@ input {
 }
 
 button,
-select,
-label {
+select {
   cursor: pointer;
 }
 
@@ -115,25 +114,49 @@ h1 {
   font-size: 19px;
 }
 
+.side,
 .tools {
   display: flex;
-  gap: 2em;
+  gap: 1em;
+  align-items: baseline;
+  justify-content: space-between;
+}
+
+.tools {
   padding-left: calc(var(--rank) + var(--gap));
+}
 
-  button {
-    color: var(--mute);
+.bar button,
+.icons a,
+.lists button {
+  color: var(--mute);
 
-    &:hover,
-    &.on {
-      color: var(--ink);
-    }
+  &:hover,
+  &.on {
+    color: var(--ink);
   }
 }
 
-.tabs {
+.tabs,
+.icons {
   display: flex;
   gap: 1em;
-  margin-right: auto;
+}
+
+.icons svg {
+  width: 1.05em;
+  height: 1.05em;
+  vertical-align: -0.15em;
+}
+
+.home svg {
+  width: 0.62em;
+  height: 0.85em;
+  fill: #ec0000;
+}
+
+.years {
+  margin-left: auto;
 }
 
 .panel {
@@ -200,11 +223,6 @@ h1 {
     padding-left: var(--flag);
     text-indent: calc(0px - var(--flag));
   }
-
-  .slot {
-    display: inline-block;
-    width: 1.4em;
-  }
 }
 
 .box {
@@ -232,15 +250,6 @@ h1 {
   display: flex;
   gap: 1em;
   padding-top: 6px;
-
-  button {
-    color: var(--mute);
-
-    &:hover,
-    &.on {
-      color: var(--ink);
-    }
-  }
 }
 
 .miss {

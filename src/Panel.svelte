@@ -1,4 +1,8 @@
 <script lang="ts" module>
+	import { flag } from "./flags";
+
+	export { badge };
+
 	export type Twig = {
 		id: number | string;
 		name: string;
@@ -10,18 +14,13 @@
 	export type Tree = {
 		name: string;
 		root: Twig;
-		at?: Twig;
-		link?: (twig: Twig) => string;
-		open?: (twig: Twig) => void;
-		mark: (twig: Twig) => number | undefined;
-		flip: (twig: Twig) => void;
+		scope?: Twig;
+		mark: (twig: Twig) => number;
+		flip: (twig: Twig, listed: boolean) => void;
 	};
 
 	export const whole = (marks: number[]) =>
 		marks.every((m) => m === 2) ? 2 : marks.some(Boolean) ? 1 : 0;
-
-	export const leaves = (twig: Twig): Twig[] =>
-		twig.children.length ? twig.children.flatMap(leaves) : [twig];
 
 	export const rooted = (root: Twig) => {
 		const walk = (twig: Twig) => {
@@ -33,18 +32,35 @@
 		walk(root);
 		return root;
 	};
+
+	export const more =
+		(grow: () => void, root?: Element) => (sentinel: Element) => {
+			const watch = new IntersectionObserver(
+				([entry]) => {
+					if (!entry.isIntersecting) return;
+					grow();
+					watch.unobserve(sentinel);
+					watch.observe(sentinel);
+				},
+				{ root, rootMargin: "100% 0px" },
+			);
+			watch.observe(sentinel);
+			return () => watch.disconnect();
+		};
 </script>
 
 <script lang="ts">
-	import { flag } from "./flags";
+	import type { Snippet } from "svelte";
 	import { fuzzy } from "./search";
 
-	let { trees }: { trees: Tree[] } = $props();
+	let { trees, tail }: { trees: Tree[]; tail: Snippet } = $props();
 
 	let list = $state(0);
 	let shut = $state(true);
 	let query = $state("");
-	let spots = $state<(number | string)[][]>([]);
+	let spots = $state<
+		({ scope?: number | string; ids: (number | string)[] } | undefined)[]
+	>([]);
 
 	const tree = $derived(trees[list]);
 
@@ -56,10 +72,27 @@
 	const ancestry = (twig: Twig): Twig[] =>
 		twig.parent ? [...ancestry(twig.parent), twig] : [twig];
 
+	const trail = (twig: Twig) =>
+		ancestry(twig)
+			.slice(1)
+			.map((t) => t.id);
+
+	$effect.pre(() => {
+		trees.forEach(({ scope }, k) => {
+			if (spots[k] && spots[k].scope !== scope?.id) spots[k] = undefined;
+		});
+	});
+
 	const at = $derived.by(() => {
-		if (tree.at) return tree.at;
 		let twig = tree.root;
-		for (const id of spots[list] ?? []) {
+		const spot = spots[list];
+		const ids =
+			spot && spot.scope === tree.scope?.id
+				? spot.ids
+				: tree.scope
+					? trail(tree.scope)
+					: [];
+		for (const id of ids) {
 			const next = twig.children.find((c) => c.id === id);
 			if (!next) break;
 			twig = next;
@@ -71,7 +104,7 @@
 		const out: Twig[] = [];
 		let level = tree.root.children;
 		while (level.length) {
-			out.push(...level);
+			for (const twig of level) out.push(twig);
 			level = level.flatMap((twig) => twig.children);
 		}
 		return out;
@@ -97,34 +130,24 @@
 		if (scroller) scroller.scrollTop = 0;
 	});
 
-	const more = (sentinel: Element) => {
-		const watch = new IntersectionObserver(
-			([entry]) => {
-				if (!entry.isIntersecting) return;
-				shown += 200;
-				watch.unobserve(sentinel);
-				watch.observe(sentinel);
-			},
-			{ root: scroller, rootMargin: "100% 0px" },
-		);
-		watch.observe(sentinel);
-		return () => watch.disconnect();
-	};
+	const ink = $derived(tree.scope ?? at);
 
 	const open = (twig: Twig) => {
 		query = "";
-		if (tree.open) tree.open(twig);
-		else
-			spots[list] = ancestry(twig)
-				.map((t) => t.id)
-				.slice(1);
+		spots[list] = { scope: tree.scope?.id, ids: trail(twig) };
 	};
 
-	const enter = (event: MouseEvent, twig: Twig) => {
-		if (event.button || event.metaKey || event.ctrlKey || event.shiftKey)
-			return;
-		event.preventDefault();
-		open(twig);
+	const flip = (
+		box: HTMLInputElement,
+		value: number,
+		twig: Twig,
+		listed: boolean,
+	) => {
+		box.checked = value === 2;
+		box.indeterminate = value === 1;
+		const ids = trail(at);
+		tree.flip(twig, listed);
+		spots[list] = { scope: tree.scope?.id, ids };
 	};
 
 	const mixed = (box: HTMLInputElement, value: boolean) => {
@@ -132,31 +155,33 @@
 	};
 </script>
 
-{#snippet item(twig: Twig, below: boolean)}
+{#snippet badge(code: string)}
+	{@const src = flag(code)}
+	{#if src}
+		<img class="flag" {src} alt="" />
+	{:else}
+		<span class="flag"></span>
+	{/if}
+{/snippet}
+
+{#snippet item(twig: Twig, listed: boolean)}
 	{@const value = tree.mark(twig)}
-	{#if value === undefined}<span class="slot"></span>{:else}<input
-			class="box"
-			type="checkbox"
-			aria-label={twig.name}
-			checked={value === 2}
-			{@attach (box) => mixed(box, value === 1)}
-			onchange={() => tree.flip(twig)}
-		/>{/if}{#if tree.link}<a
-			class:miss={below && value === 0}
-			href={tree.link(twig)}
-			aria-current={twig === at && !below ? "page" : undefined}
-			onclick={(event) => enter(event, twig)}>{twig.name}</a
-		>{:else}<button
-			class:miss={below && value === 0}
-			class:flagged={twig.code !== undefined}
-			aria-current={twig === at && !below ? "true" : undefined}
-			onclick={() => (twig.children.length ? open(twig) : tree.flip(twig))}
-			>{#if twig.code !== undefined}{#if flag(twig.code)}<img
-						class="flag"
-						src={flag(twig.code)}
-						alt=""
-					/>{:else}<span class="flag"></span>{/if}{/if}{twig.name}</button
-		>{/if}
+	<input
+		class="box"
+		type="checkbox"
+		aria-label={twig.name}
+		checked={value === 2}
+		{@attach (box) => mixed(box, value === 1)}
+		onchange={(event) => flip(event.currentTarget, value, twig, listed)}
+	/><button
+		class:miss={listed && value === 0}
+		class:flagged={twig.code !== undefined}
+		aria-current={twig === ink && !listed ? "true" : undefined}
+		onclick={() => open(twig)}
+		>{#if twig.code !== undefined}{@render badge(
+				twig.code,
+			)}{/if}{twig.name}</button
+	>
 {/snippet}
 
 <nav class={["panel", { shut }]}>
@@ -169,11 +194,12 @@
 				onclick={() => pick(k)}>{name}</button
 			>
 		{/each}
+		{@render tail()}
 	</div>
 	{#if path.length}
 		<ul class="path">
 			{#each path as twig (twig.id)}
-				<li class:up={twig !== at}>{@render item(twig, false)}</li>
+				<li class:up={twig !== ink}>{@render item(twig, false)}</li>
 			{/each}
 		</ul>
 	{/if}
@@ -187,7 +213,7 @@
 			</li>
 		{/each}
 		{#if shown < items.length}
-			<li {@attach more}></li>
+			<li {@attach more(() => (shown += 200), scroller)}></li>
 		{/if}
 	</ul>
 </nav>

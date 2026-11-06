@@ -1,0 +1,142 @@
+const plural = (n: number, one: string, many: string) =>
+	`${n} ${n === 1 ? one : many}`;
+
+export const en = {
+	locale: "en-GB",
+	name: "English",
+	flag: "GB",
+	cjk: false,
+	pdf: "allrankings.pdf",
+	figure: "Figure",
+	abstract: "Abstract",
+	references: "References",
+	copy: "Copy",
+	copied: "Copied",
+	release: (r: string) => `Release ${r}`,
+	date: (d: Date) =>
+		d.toLocaleDateString("en-GB", {
+			day: "numeric",
+			month: "long",
+			year: "numeric",
+		}),
+	font: '"TeX Gyre Termes", "Times New Roman", Times, serif',
+	sep: ", ",
+	list: "; ",
+	area: "Area",
+	log: "Log",
+	linear: "Linear",
+	blank: "Blank country",
+	other: "Other countries",
+	apportion: {
+		topic: "Topic",
+		subfield: "Subfield",
+		field: "Field",
+		domain: "Domain",
+		idle: (K: number, refs: number) =>
+			`${K} of ${refs} references have a primary topic, so K = ${K}`,
+		item: (k: number, K: number, share: string) =>
+			`: k = ${k}, share ${k}/${K} = ${share}`,
+	},
+	tiers: {
+		axis: "Cumulative share of paper mass",
+		ranked: "Venues ranked by φ",
+		rank: "Rank",
+		venue: "Venue",
+		mass: "Mass",
+		idle: (pool: string, t1: string, t2: string, t3: string) =>
+			`${pool} venues; T1 ends at rank ${t1}, T2 at ${t2}, T3 at ${t3}`,
+		tail: (share: string) => `cumulative share ${share}`,
+		at: (rank: string, tier: number, tail: string) =>
+			`Rank ${rank}, T${tier}, ${tail}`,
+		named: (phi: string, mass: string, tier: number, tail: string) =>
+			`, φ ${phi}, mass ${mass}, T${tier}, ${tail}`,
+	},
+	counting: {
+		author: "Author",
+		institution: "Institution",
+		per: "Per institution",
+		empty: "Empty list",
+		micro: ["Micro-papers"],
+		split: ["Micro-", "papers"],
+		sum: "Sum",
+		alone: (a: string, n: number) => `Author ${a}: 1/${n} on an empty list`,
+		tied: (a: string, m: number, share: string) =>
+			`Author ${a}: ${plural(m, "institution", "institutions")}, ${share} to each`,
+		idle: (n: number, kc: number, K: number) =>
+			`N = ${n} authors; the checked children hold ${kc} of K = ${K} references`,
+	},
+	faculty: {
+		children: ["Physics", "Mathematics"],
+		person: "Person",
+		paper: "Paper",
+		institution: "Institution",
+		authors: "Authors",
+		total: "Total",
+		per: "Per author",
+		all: "Authors from all papers",
+		t1: "Authors from T1 papers",
+		slider: "T1 papers",
+		axis: "T1 papers of 10",
+		leaf: (p: string, n: number, place: string, part: string) =>
+			`Person ${p}, paper ${n}, ${place}: ${part} of a person-year`,
+		entry: (
+			p: string,
+			n: number,
+			part: string,
+			s: number[],
+			children: string[],
+		) =>
+			`Person ${p}, paper ${n}: ${part}, split ${s[0]} to ${children[0]} and ${s[1]} to ${children[1]}`,
+		idle: (n: number) =>
+			`${plural(n, "T1 paper", "T1 papers")} of 10: Per author ${n} with Authors 1, and ${n ? 10 : 0} with Authors ${n / 10}`,
+	},
+	composition: {
+		field: "Field",
+		share: "T1 share",
+		item: (tiers: string, papers: string) => `: ${tiers} of ${papers} papers`,
+	},
+	validity: {
+		top10: "Top 10%",
+		top1: "Top 1%",
+		fwci: "FWCI",
+		item: (list: string) => `, T1 to T4: ${list}`,
+	},
+	concentration: {
+		top: "Top shares",
+		lorenz: "Lorenz",
+		axis: "Share of T1 Count",
+		smallest: "Share of institutions, smallest first",
+		largest: "Share of institutions, largest first",
+		top10: "Top 10",
+		top100: "Top 100",
+		item: (top10: string, top100: string, gini: string) =>
+			`: top 10 hold ${top10}, top 100 hold ${top100}, Gini ${gini}`,
+	},
+	countries: {
+		axis: "Share of T1 Count",
+		item: (name: string, year: number, share: string) =>
+			`${name}, ${year}: ${share} of T1 Count`,
+	},
+	stability: {
+		axis: "Spearman correlation with the previous year",
+		short: "Spearman ρ with the previous year",
+		mean: (mean: string, from: number, to: number) =>
+			`: mean ${mean} over ${from} to ${to}`,
+		year: (from: number, to: number, rho: string) =>
+			`, ${from} to ${to}: ${rho}`,
+	},
+	scaling: {
+		count: (view: string) => `Count, ${view}`,
+		authors: "Authors",
+		slope: "Slope",
+		fit: (n: string, slope: string) =>
+			`Fit over ${n} institutions, slope ${slope}`,
+		short: (slope: string) => `Fit, slope ${slope}`,
+		point: (c: string, f: string, r: string) =>
+			`: Count ${c}, Authors ${f}, Per author ${r}`,
+		row: (slope: string, r2: string, n: string) =>
+			`: slope ${slope}, R² ${r2}, ${n} institutions`,
+	},
+};
+
+export type Words = typeof en;

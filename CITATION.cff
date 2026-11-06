@@ -1,0 +1,11 @@
+cff-version: 1.2.0
+message: To cite AllRankings, name the release shown on its About page.
+title: AllRankings
+type: software
+authors:
+  - name: clareLab
+    email: yaho@clarelab.moe
+    website: "https://clarelab.moe"
+url: "https://ar.clarelab.moe"
+repository-code: "https://github.com/clareLab/scholar-ar"
+abstract: Institution rankings for every area of science, built from OpenAlex.

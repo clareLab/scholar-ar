@@ -1,23 +1,37 @@
 <script lang="ts">
 	import { tick } from "svelte";
 	import {
+		count,
 		credit,
+		defaults,
+		ends,
+		forget,
 		type Group,
 		groups,
+		having,
 		hundredths,
+		leaves,
 		type Meta,
 		micro,
 		type Node,
 		type People,
 		read as part,
+		shelve,
+		slot,
+		stalls,
 		starts,
+		swaps,
+		tally,
 		topics,
-		total,
+		whole as every,
+		years as bounds,
 	} from "./data";
 	import { continents } from "./continents";
-	import { country, flag } from "./flags";
+	import { type Lang, langs, words } from "./about/words";
+	import { country } from "./flags";
 	import Panel, {
-		leaves,
+		badge,
+		more,
 		rooted,
 		type Tree,
 		type Twig,
@@ -26,19 +40,19 @@
 
 	let { meta }: { meta: Meta } = $props();
 
-	const { index, nodes, institutions, venues } = $derived(meta);
-	const release = $derived(index.release);
+	const { nodes, institutions, venues } = $derived(meta);
 	const tabs = [
 		["institutions", "Institutions"],
 		["venues", "Venues"],
+		["about", "About"],
 	] as const;
 	const sorts = [
 		["count", "Count"],
-		["faculty", "Faculty"],
-		["ratio", "Per faculty"],
+		["authors", "Authors"],
+		["ratio", "Per author"],
 	] as const;
 	const tiers = [1, 2, 3, 4];
-	const means = ["count", "faculty", "venues"] as const;
+	const means = ["count", "authors", "venues"] as const;
 
 	type Tab = (typeof tabs)[number][0];
 	type Sort = (typeof sorts)[number][0];
@@ -53,6 +67,7 @@
 		at: string[];
 		above: Mean[];
 		tab: Tab;
+		lang: Lang;
 		sort: Sort;
 		inst?: number;
 		venue?: number;
@@ -64,9 +79,13 @@
 	const list = (value: string | null) =>
 		(value ?? "").split(",").filter(Boolean);
 
-	const lands = $derived(
-		[...new Set(institutions.country)].filter(Boolean).sort(),
-	);
+	const lands = $derived.by(() => {
+		const seen = new Set([...institutions.country, ...venues.country]);
+		return continents
+			.flatMap(([, codes]) => codes.split(" "))
+			.filter((code) => seen.has(code))
+			.sort();
+	});
 
 	const read = (): State => {
 		const q = new URLSearchParams(location.search);
@@ -74,14 +93,14 @@
 			const value = Number(q.get(key) ?? Number.NaN);
 			return Number.isInteger(value) ? value : or;
 		};
-		const [low, high] = index.years;
+		const [low, high] = bounds;
 		const clamp = (year: number) => Math.min(Math.max(year, low), high);
-		const from = clamp(int("from", index.default_years[0]));
+		const from = clamp(int("from", defaults[0]));
 		const view = int("view", 0);
 		return {
 			view: nodes.has(view) ? view : 0,
 			from,
-			to: Math.max(clamp(int("to", index.default_years[1])), from),
+			to: Math.max(clamp(int("to", defaults[1])), from),
 			tiers: tiers.filter((t) => (q.get("tiers") ?? "1").includes(`${t}`)),
 			flip: list(q.get("flip")).filter((key) => /^[1-4]\.\d+$/.test(key)),
 			off: list(q.get("off")).map(Number),
@@ -92,6 +111,7 @@
 				(key) => !q.has("above") || list(q.get("above")).includes(key),
 			),
 			tab: tabs.find(([key]) => key === q.get("tab"))?.[0] ?? "institutions",
+			lang: langs.find((key) => key === q.get("lang")) ?? "en",
 			sort: sorts.find(([key]) => key === q.get("sort"))?.[0] ?? "count",
 			inst: q.has("inst") ? int("inst", -1) : undefined,
 			venue: q.has("venue") ? int("venue", -1) : undefined,
@@ -101,10 +121,7 @@
 	const url = (state: State) => {
 		const parts = [];
 		if (state.view) parts.push(`view=${state.view}`);
-		if (
-			state.from !== index.default_years[0] ||
-			state.to !== index.default_years[1]
-		)
+		if (state.from !== defaults[0] || state.to !== defaults[1])
 			parts.push(`from=${state.from}`, `to=${state.to}`);
 		if (state.tiers.join("") !== "1")
 			parts.push(`tiers=${state.tiers.join("")}`);
@@ -115,13 +132,17 @@
 		if (state.above.length !== means.length)
 			parts.push(`above=${state.above.join(",")}`);
 		if (state.tab !== "institutions") parts.push(`tab=${state.tab}`);
+		if (state.tab === "about" && state.lang !== "en")
+			parts.push(`lang=${state.lang}`);
 		if (state.sort !== "count") parts.push(`sort=${state.sort}`);
 		if (state.inst !== undefined) parts.push(`inst=${state.inst}`);
 		if (state.venue !== undefined) parts.push(`venue=${state.venue}`);
 		return location.pathname + (parts.length ? `?${parts.join("&")}` : "");
 	};
 
-	let s = $state(read());
+	const first = read();
+
+	let s = $state(first);
 
 	$effect(() => {
 		const next = url(s);
@@ -129,12 +150,10 @@
 			history.replaceState(null, "", next);
 	});
 
-	const link = (view: number) => url({ ...s, view, flip: [], off: [] });
-
-	const go = (view: number) => {
-		if (view === s.view) return;
-		history.pushState(null, "", link(view));
-		s = { ...s, view, flip: [], off: [] };
+	const rescope = (view: number, off: number[]) => {
+		const next = { ...s, view, flip: [], off };
+		history.pushState(null, "", url(next));
+		s = next;
 	};
 
 	const flipped = <T,>(keys: T[], key: T) =>
@@ -142,7 +161,7 @@
 
 	const node = $derived(nodes.get(s.view) as Node);
 	const years = $derived(span(s.from, s.to));
-	const base = $derived(`${release}/views/${node.level}/${node.id}`);
+	const base = $derived(`views/${node.level}/${node.id}`);
 	const range = $derived(`${s.from}-${s.to}`);
 	const chosen = $derived(new Set(s.tiers));
 	const flips = $derived(new Set(s.flip));
@@ -155,89 +174,76 @@
 	const seat = $derived(
 		s.venue === undefined ? -1 : venues.id.indexOf(s.venue),
 	);
-	const within = (year: number) => year >= s.from && year <= s.to;
 	const land = (code: string) => at.size === lands.length || at.has(code);
-	const ends = (year: number) => year === s.to || year === s.from - 1;
-	const sign = (r: number, g: Group) => (g.year[r] === s.to ? 1 : -1);
 	const picked = (t: number, v: number) =>
 		chosen.has(t) !== flips.has(`${t}.${venues.id[v]}`);
-	const fresh = (r: number, g: Group) => !g.child || !off.has(g.child[r]);
-	const slot = (v: number, year: number) => v * 4096 + year;
+	const all = $derived(every(node, off));
 
-	let got = $state.raw(new Map<string, unknown>());
+	let got = $derived.by(() => {
+		void base;
+		return new Map<string, unknown>();
+	});
+
+	$effect(() => forget(base));
 
 	const take = <T,>(key: string, make: () => Promise<T>) => {
 		if (got.has(key)) return got.get(key) as T;
+		const view = base;
 		make().then((value) => {
-			if (!got.has(key)) got = new Map(got).set(key, value);
+			if (view === base && !got.has(key)) got = new Map(got).set(key, value);
 		});
 	};
 
 	const cells = $derived(
-		take(`${base}/venues ${range}`, () =>
-			groups(`${base}/venues.parquet`, (stat) => within(stat("year")[0])),
-		),
+		take(`${base}/venues ${range}`, () => stalls(node, years, true)),
+	);
+	const wares = $derived(
+		!node.children.length || all
+			? cells
+			: node.children.every((child) => off.has(child.id))
+				? []
+				: take(`${base}/venues ${range} split`, () =>
+						stalls(node, years, false),
+					),
 	);
 	const counts = $derived(
-		take(`${base}/counts ${range} ${s.tiers}`, () =>
-			groups(
-				`${base}/counts.parquet`,
-				(stat) => ends(stat("year")[0]) && chosen.has(stat("tier")[0]),
-			),
+		take(`${base}/counts ${range} ${s.tiers} ${all}`, () =>
+			ends(node, "counts", "n", [s.from, s.to], all, { tier: [...s.tiers] }),
 		),
 	);
 	const faculty = $derived(
-		take(`${base}/faculty ${range}`, () =>
-			groups(`${base}/faculty.parquet`, (stat) => ends(stat("year")[0])),
+		take(`${base}/faculty ${range} ${all}`, () =>
+			ends(node, "faculty", "f", [s.from, s.to], all),
 		),
 	);
 
-	type Listing = { key: string; tier: number; v: number; name: string };
+	let shelved: Group[] = [];
 
 	const shelf = $derived.by(() => {
-		const tier = new Map<number, number>();
-		const mass = new Map<string, [number, number, number]>();
-		for (const { year, v, tier: t, mass: m } of cells ?? []) {
-			for (let r = 0; r < v.length; r++) {
-				tier.set(slot(v[r], year[r]), t[r]);
-				const key = `${t[r]}.${venues.id[v[r]]}`;
-				const cell = mass.get(key) ?? [t[r], v[r], 0];
-				cell[2] += m[r];
-				mass.set(key, cell);
-			}
-		}
-		const listings = tiers.map((): Listing[] => []);
-		for (const [key, [t, v]] of [...mass].sort(
-			(a, b) => b[1][2] - a[1][2] || a[1][1] - b[1][1],
-		))
-			listings[t - 1].push({ key, tier: t, v, name: venues.name[v] });
-		return { tier, mass, listings };
+		shelved = cells ?? shelved;
+		return shelve(shelved, venues.id);
 	});
 
-	const active = $derived(s.flip.filter((key) => shelf.mass.has(key)));
-
 	const bundles = $derived(
-		active.map((key) => {
-			const [t, v] = shelf.mass.get(key) as [number, number, number];
-			const files = take(`${base}/venue ${v} ${t} ${range}`, () =>
-				groups(`${release}/venue/${v}.parquet`, (stat) => {
-					const year = stat("year")[0];
-					return within(year) && shelf.tier.get(slot(v, year)) === t;
-				}),
-			);
-			return { sign: chosen.has(t) ? -1 : 1, files };
-		}),
+		(cells ? swaps(shelf, s.flip, chosen, years) : []).map(
+			({ key, sign, read }) => ({
+				sign,
+				files: take(`${base}/venue ${key} ${range}`, read),
+			}),
+		),
 	);
 
 	const ready = $derived(
-		cells && counts && faculty && bundles.every((b) => b.files),
+		[cells, counts, faculty].every(Boolean) &&
+			bundles.every((b) => b.files) &&
+			(s.tab !== "venues" || Boolean(wares)),
 	);
 
 	type Row = {
 		i: number;
 		rank: number;
 		count: number;
-		faculty: number;
+		authors: number;
 		people: number;
 		ratio: number;
 		name: string;
@@ -258,17 +264,17 @@
 		return rows;
 	};
 
-	let last: Row[] = [];
-
-	const table = $derived.by(() => {
-		if (!ready) return last;
+	const listed = $derived.by(() => {
+		if (!ready) return undefined;
 		const size = institutions.id.length;
-		const value = (key: string) => (r: number, g: Group) =>
-			fresh(r, g) ? sign(r, g) * g[key][r] : 0;
-		const sums = total(counts ?? [], size, "i", value("n"));
-		for (const { sign, files } of bundles)
-			credit(files ?? [], under, "i", () => true, sums, sign);
-		const people = total(faculty ?? [], size, "i", value("f"));
+		const sums = count(
+			counts ?? [[], []],
+			bundles.map(({ sign, files }) => ({ sign, files: files ?? [] })),
+			under,
+			off,
+			size,
+		);
+		const people = tally(faculty ?? [[], []], size, "f", off);
 		const rows: Row[] = [];
 		for (let i = 0; i < size; i++) {
 			const n = sums[i];
@@ -279,17 +285,27 @@
 				i,
 				rank: 0,
 				count: n,
-				faculty: f,
+				authors: f,
 				people: sum,
 				ratio: f ? n / f : 0,
 				name: institutions.name[i],
 			});
 		}
-		const floors = (["count", "faculty"] as const)
+		return rows;
+	});
+
+	let last: Row[] = [];
+
+	const table = $derived.by(() => {
+		const rows = listed;
+		if (!rows) return last;
+		const floors = (["count", "authors"] as const)
 			.filter((key) => above.has(key))
 			.map((key) => [key, mean(rows, (row) => row[key])] as const);
 		last = rank(
-			rows.filter((row) => floors.every(([key, m]) => row[key] > m)),
+			rows
+				.filter((row) => floors.every(([key, m]) => row[key] > m))
+				.map((row) => ({ ...row })),
 			(row) => row[s.sort],
 			(a, b) => a.name.localeCompare(b.name),
 		);
@@ -332,16 +348,18 @@
 		return lo < list.length && list[lo] <= high;
 	};
 
-	const crew = $derived(
-		open < 0 || !cells
-			? undefined
-			: take(`institution ${open} ${base} ${range} ${s.tiers} ${s.flip}`, () =>
-					groups(`${release}/institution/${open}.parquet`, (stat) =>
-						holds(sought.get(stat("year")[0]), stat("v")),
-					),
+	const crew = $derived.by(() => {
+		if (open < 0 || !cells) return undefined;
+		const want = sought;
+		return take(
+			`institution ${open} ${base} ${range} ${s.tiers} ${s.flip}`,
+			() =>
+				groups(`institution/${open}.parquet`, (stat) =>
+					holds(want.get(stat("year")[0]), stat("v")),
 				),
-	);
-	const roll = $derived(`${release}/institution/${open}.people.parquet`);
+		);
+	});
+	const roll = $derived(`institution/${open}.people.parquet`);
 	const roster = $derived(
 		open < 0 ? undefined : take(`roster ${open}`, () => starts(roll)),
 	);
@@ -403,21 +421,27 @@
 		n: number;
 		rank: number;
 		tiers: string[];
-		parts: { year: number; t: number; n: number }[];
+		parts: Map<number, { year: number; t: number; n: number }>;
 	};
 
+	let stocked: Stock[] = [];
+
 	const stock = $derived.by(() => {
+		if (!wares) return stocked;
 		const rows = new Map<number, Stock>();
-		for (const { year, v, tier: t, mass } of cells ?? []) {
+		for (const { year, child, v, tier: t, mass } of wares) {
 			for (let r = 0; r < v.length; r++) {
+				if (child && off.has(child[r])) continue;
 				let row = rows.get(v[r]);
 				if (!row) {
 					const tiers = years.map(() => "");
-					row = { v: v[r], n: 0, rank: 0, tiers, parts: [] };
+					row = { v: v[r], n: 0, rank: 0, tiers, parts: new Map() };
 					rows.set(v[r], row);
 				}
 				row.tiers[year[r] - s.from] = `${t[r]}`;
-				row.parts.push({ year: year[r], t: t[r], n: mass[r] });
+				const part = row.parts.get(year[r]) ?? { year: year[r], t: t[r], n: 0 };
+				part.n += mass[r];
+				row.parts.set(year[r], part);
 				if (picked(t[r], v[r])) row.n += mass[r];
 			}
 		}
@@ -427,20 +451,19 @@
 		const floor = above.has("venues")
 			? mean(listed, (row) => row.n)
 			: Number.NEGATIVE_INFINITY;
-		return rank(
+		stocked = rank(
 			listed.filter((row) => row.n > floor),
 			(row) => row.n,
 			(a, b) => venues.name[a.v].localeCompare(venues.name[b.v]),
 		);
+		return stocked;
 	});
 
 	const scores = $derived(
 		seat < 0
 			? undefined
 			: take(`scores ${range}`, () =>
-					groups(`${release}/scores.parquet`, (stat) =>
-						within(stat("year")[0]),
-					),
+					groups("scores.parquet", having({ year: years })),
 				),
 	);
 
@@ -477,23 +500,26 @@
 	const sow = (twig: Twig) => (off.has(twig.id as number) ? 0 : 2);
 	const sown = $derived(whole(node.children.map(sow)));
 
+	const ids = (twigs: Twig[]) =>
+		twigs.map((twig) => twig.id as number).sort((a, b) => a - b);
+
 	const areas: Tree = $derived({
 		name: "Areas",
 		root: nodes.get(0) as Node,
-		at: node,
-		link: (twig) => link(twig.id as number),
-		open: (twig) => go(twig.id as number),
+		scope: node,
 		mark: (twig) =>
-			twig === node && node.children.length
-				? sown
-				: twig.parent === node
-					? sow(twig)
-					: undefined,
-		flip: (twig) => {
-			const all = sown === 2 ? node.children.map((c) => c.id) : [];
-			s.off = (twig === node ? all : flipped(s.off, twig.id as number)).sort(
-				(a, b) => a - b,
-			);
+			twig === node ? sown : twig.parent === node ? sow(twig) : 0,
+		flip: (twig, listed) => {
+			const parent = twig.parent as Twig;
+			if (twig === node) s.off = sown === 2 ? ids(node.children) : [];
+			else if (listed && parent === node)
+				s.off = flipped(s.off, twig.id as number).sort((a, b) => a - b);
+			else if (listed)
+				rescope(
+					parent.id as number,
+					ids(parent.children.filter((c) => c !== twig)),
+				);
+			else rescope(twig.id as number, []);
 		},
 	});
 
@@ -507,7 +533,7 @@
 				name: `T${t}`,
 				children: shelf.listings[t - 1].map((l) => ({
 					id: l.key,
-					name: l.name,
+					name: venues.name[l.v],
 					code: venues.country[l.v],
 					children: [],
 				})),
@@ -573,20 +599,6 @@
 		return 200;
 	});
 
-	const more = (grow: () => void) => (sentinel: Element) => {
-		const watch = new IntersectionObserver(
-			([entry]) => {
-				if (!entry.isIntersecting) return;
-				grow();
-				watch.unobserve(sentinel);
-				watch.observe(sentinel);
-			},
-			{ rootMargin: "100% 0px" },
-		);
-		watch.observe(sentinel);
-		return () => watch.disconnect();
-	};
-
 	const ratio = (row: Row) =>
 		row.people ? hundredths(row.count * years.length, row.people) : "0.00";
 
@@ -622,6 +634,42 @@
 			s.venue = s.venue === id ? undefined : id;
 		});
 
+	let arrive =
+		first.tab === "institutions"
+			? first.inst !== undefined
+			: first.tab === "venues" && first.venue !== undefined;
+
+	let landing = $state(false);
+
+	$effect(() => {
+		if (!arrive || !ready) return;
+		arrive = false;
+		const k =
+			s.tab === "institutions"
+				? table.findIndex((row) => row.i === open)
+				: stock.findIndex((row) => row.v === seat);
+		if (k < 0) {
+			if (s.tab === "institutions") s.inst = undefined;
+			else s.venue = undefined;
+			return;
+		}
+		shown = Math.max(shown, k + 200);
+		landing = true;
+	});
+
+	$effect(() => {
+		if (!landing || busy) return;
+		landing = false;
+		tick().then(async () => {
+			await document.fonts.ready;
+			const group = document.querySelector("main .group");
+			const row = group?.querySelector(".open");
+			if (!group || !row) return;
+			const top = Number.parseFloat(getComputedStyle(row).top);
+			scrollTo(0, scrollY + group.getBoundingClientRect().top - top);
+		});
+	});
+
 	const csv = () => {
 		const cell = (value: string | number) =>
 			/[",\n]/.test(`${value}`) ? `"${`${value}`.replace(/"/g, '""')}"` : value;
@@ -633,15 +681,15 @@
 							"Institution",
 							"Country",
 							"Count",
-							"Faculty",
-							"Per faculty",
+							"Authors",
+							"Per author",
 						],
 						...table.map((row) => [
 							row.rank,
 							row.name,
 							institutions.country[row.i],
 							micro(row.count),
-							micro(row.faculty),
+							micro(row.authors),
 							ratio(row),
 						]),
 					]
@@ -669,14 +717,27 @@
 
 <svelte:window onpopstate={() => (s = read())} />
 
+{#snippet tab(key: Tab, label: string)}
+	<button
+		class:on={s.tab === key}
+		aria-pressed={s.tab === key}
+		onclick={() => (s.tab = key)}>{label}</button
+	>
+{/snippet}
+
+{#snippet down()}
+	<svg viewBox="0 0 16 16" aria-hidden="true"
+		><path
+			fill="none"
+			stroke="currentColor"
+			stroke-width="1.5"
+			d="M8 1.5v9M4 7l4 4 4-4M2 14.5h12"
+		/></svg
+	>
+{/snippet}
+
 {#snippet name(code: string, text: string)}
-	<span class="name">
-		{#if flag(code)}
-			<img class="flag" src={flag(code)} alt="" />
-		{:else}
-			<span class="flag"></span>
-		{/if}{text}
-	</span>
+	<span class="name">{@render badge(code)}{text}</span>
 {/snippet}
 
 {#snippet floor(key: Mean, title: string)}
@@ -712,155 +773,205 @@
 	<span class="rank">{row.rank}</span>
 	{@render name(institutions.country[row.i], row.name)}
 	<span class="num">{micro(row.count)}</span>
-	<span class="num">{micro(row.faculty)}</span>
-	<span class="num">{row.faculty ? ratio(row) : ""}</span>
+	<span class="num">{micro(row.authors)}</span>
+	<span class="num">{row.authors ? ratio(row) : ""}</span>
 {/snippet}
 
 <header class="bar">
-	<h1>AllRankings</h1>
+	<div class="side">
+		<h1><a href="./">AllRankings</a></h1>
+		{@render tab("about", "About")}
+	</div>
 	<div class="tools">
 		<span class="tabs">
-			{#each tabs as [tab, label] (tab)}
-				<button
-					class:on={s.tab === tab}
-					aria-pressed={s.tab === tab}
-					onclick={() => (s.tab = tab)}>{label}</button
-				>
+			{#each tabs.slice(0, 2) as [key, label] (key)}
+				{@render tab(key, label)}
 			{/each}
 		</span>
-		<span class="years">
-			<select bind:value={s.from} aria-label="From">
-				{#each span(index.years[0], s.to) as year (year)}
-					<option value={year}>{year}</option>
-				{/each}
-			</select>
-			–
-			<select bind:value={s.to} aria-label="To">
-				{#each span(s.from, index.years[1]) as year (year)}
-					<option value={year}>{year}</option>
-				{/each}
-			</select>
+		<span class="icons">
+			{#if s.tab === "about"}
+				<a
+					href="{import.meta.env.BASE_URL}{words[s.lang].pdf}"
+					download
+					title="Download PDF"
+					aria-label="Download PDF">{@render down()}</a
+				>
+			{:else}
+				<button
+					disabled={!ready}
+					title="Download CSV"
+					aria-label="Download CSV"
+					onclick={csv}>{@render down()}</button
+				>
+			{/if}
+			<a
+				href="https://github.com/clareLab/scholar-ar"
+				target="_blank"
+				rel="noopener"
+				title="GitHub"
+				aria-label="GitHub"
+				><svg viewBox="0 0 16 16" aria-hidden="true"
+					><path
+						fill="currentColor"
+						d="M6.766 11.328c-2.063-.25-3.516-1.734-3.516-3.656 0-.781.281-1.625.75-2.188-.203-.515-.172-1.609.063-2.062.625-.078 1.468.25 1.968.703.594-.187 1.219-.281 1.985-.281.765 0 1.39.094 1.953.265.484-.437 1.344-.765 1.969-.687.218.422.25 1.515.046 2.047.5.593.766 1.39.766 2.203 0 1.922-1.453 3.375-3.547 3.64.531.344.89 1.094.89 1.954v1.625c0 .468.391.734.86.547C13.781 14.359 16 11.53 16 8.03 16 3.61 12.406 0 7.984 0 3.563 0 0 3.61 0 8.031a7.88 7.88 0 0 0 5.172 7.422c.422.156.828-.125.828-.547v-1.25c-.219.094-.5.156-.75.156-1.031 0-1.64-.562-2.078-1.609-.172-.422-.36-.672-.719-.719-.187-.015-.25-.093-.25-.187 0-.188.313-.328.625-.328.453 0 .844.281 1.25.86.313.452.64.655 1.031.655s.641-.14 1-.5c.266-.265.47-.5.657-.656"
+					/></svg
+				></a
+			>
+			<a
+				class="home"
+				href="https://clarelab.moe"
+				target="_blank"
+				rel="noopener"
+				title="clareLab"
+				aria-label="clareLab"
+				><svg viewBox="5 1 22 30" aria-hidden="true"
+					><path d="M16 1Q21 9 27 16Q21 23 16 31Q11 23 5 16Q11 9 16 1Z" /></svg
+				></a
+			>
 		</span>
-		<button onclick={csv}>CSV</button>
 	</div>
 </header>
 
-<Panel trees={[areas, nations, shelves]} />
+{#if s.tab === "about"}
+	{#await import("./about/About.svelte") then { default: About }}
+		<About bind:lang={s.lang} />
+	{/await}
+{:else}
+	<Panel trees={[areas, nations, shelves]}>
+		{#snippet tail()}
+			<span class="years">
+				<select bind:value={s.from} aria-label="From">
+					{#each span(bounds[0], s.to) as year (year)}
+						<option value={year}>{year}</option>
+					{/each}
+				</select>
+				–
+				<select bind:value={s.to} aria-label="To">
+					{#each span(s.from, bounds[1]) as year (year)}
+						<option value={year}>{year}</option>
+					{/each}
+				</select>
+			</span>
+		{/snippet}
+	</Panel>
 
-<main
-	class={[s.tab, { busy }]}
-	style:--years={years.length}
-	style:--digits={String(size).length}
->
-	<div class="row head">
-		{#if s.tab === "institutions"}
-			<span class="rank">#</span><span class="title">Institution</span>
-			{#each sorts as [key, label] (key)}
-				<span class="sort"
-					><span
-						>{#if key !== "ratio"}{@render floor(
-								key,
-								`Only institutions above the mean ${label}`,
-							)}{/if}<button
-							class:on={s.sort === key}
-							aria-pressed={s.sort === key}
-							onclick={() => (s.sort = key)}>{label}</button
-						></span
-					></span
-				>
-			{/each}
-		{:else}
-			<span class="rank">#</span>
-			<span class="entry">
-				<span class="name title">Venue</span>
-				<span class="figures">
-					<span class="strip"><span class="num">Tier</span></span>
+	<main
+		class={[s.tab, { busy }]}
+		style:--years={years.length}
+		style:--digits={String(size).length}
+	>
+		<div class="row head">
+			{#if s.tab === "institutions"}
+				<span class="rank">#</span><span class="title">Institution</span>
+				{#each sorts as [key, label] (key)}
 					<span class="sort"
 						><span
-							>{@render floor(
-								"venues",
-								"Only venues above the mean Count",
-							)}Count</span
+							>{#if key !== "ratio"}{@render floor(
+									key,
+									`Only institutions above the mean ${label}`,
+								)}{/if}<button
+								class:on={s.sort === key}
+								aria-pressed={s.sort === key}
+								onclick={() => (s.sort = key)}>{label}</button
+							></span
 						></span
 					>
+				{/each}
+			{:else}
+				<span class="rank">#</span>
+				<span class="entry">
+					<span class="name title">Venue</span>
+					<span class="figures">
+						<span class="strip"><span class="num">Tier</span></span>
+						<span class="sort"
+							><span
+								>{@render floor(
+									"venues",
+									"Only venues above the mean Count",
+								)}Count</span
+							></span
+						>
+					</span>
 				</span>
-			</span>
-		{/if}
-	</div>
-	{#if s.tab === "institutions"}
-		{#each table.slice(0, shown) as row (row.i)}
-			{#if row.i === open}
-				<div class="group">
+			{/if}
+		</div>
+		{#if s.tab === "institutions"}
+			{#each table.slice(0, shown) as row (row.i)}
+				{#if row.i === open}
+					<div class="group">
+						<button
+							class="row open"
+							aria-expanded="true"
+							onclick={(event) => expand(event, row.i)}
+							>{@render line(row)}</button
+						>
+						{#each team.slice(0, known) as person (person.a)}
+							{@const [id, label] = folk.get(person.a) ?? [0, ""]}
+							<div class="row sub">
+								<span class="rank"></span>
+								<span class="name"
+									><span class="seq">{person.rank}</span><a
+										href="https://openalex.org/A{id}"
+										target="_blank"
+										rel="noopener">{label}</a
+									></span
+								>
+								<span class="num">{micro(person.n)}</span>
+							</div>
+						{/each}
+						{#if known === crowd && crowd < team.length}
+							<div {@attach more(() => (crowd += 200))}></div>
+						{/if}
+					</div>
+				{:else}
 					<button
-						class="row open"
-						aria-expanded="true"
+						class="row"
+						aria-expanded="false"
 						onclick={(event) => expand(event, row.i)}
 						>{@render line(row)}</button
 					>
-					{#each team.slice(0, known) as person (person.a)}
-						{@const [id, label] = folk.get(person.a) ?? [0, ""]}
-						<div class="row sub">
-							<span class="rank"></span>
-							<span class="name"
-								><span class="seq">{person.rank}</span><a
-									href="https://openalex.org/A{id}"
-									target="_blank"
-									rel="noopener">{label}</a
-								></span
-							>
-							<span class="num">{micro(person.n)}</span>
-						</div>
-					{/each}
-					{#if known === crowd && crowd < team.length}
-						<div {@attach more(() => (crowd += 200))}></div>
-					{/if}
-				</div>
-			{:else}
-				<button
-					class="row"
-					aria-expanded="false"
-					onclick={(event) => expand(event, row.i)}>{@render line(row)}</button
-				>
-			{/if}
-		{/each}
-	{:else}
-		{#each stock.slice(0, shown) as row (row.v)}
-			{#if row.v === seat}
-				<div class="group">
+				{/if}
+			{/each}
+		{:else}
+			{#each stock.slice(0, shown) as row (row.v)}
+				{#if row.v === seat}
+					<div class="group">
+						<button
+							class="row open"
+							aria-expanded="true"
+							onclick={(event) => unfold(event, row.v)}
+							>{@render venue(row)}</button
+						>
+						{#each [...row.parts.values()].sort((a, b) => a.year - b.year) as part (part.year)}
+							<div class={["row part", { miss: !picked(part.t, row.v) }]}>
+								<span class="rank"></span>
+								<span class="entry">
+									{@render name("", `${part.year}`)}
+									<span class="figures">
+										<span class="score">{score(row.v, part.year)}</span>
+										<span class="strip">
+											{#each years as year (year)}
+												<span>{year === part.year ? part.t : "\u2007"}</span>
+											{/each}
+										</span>
+										<span class="num">{micro(part.n)}</span>
+									</span>
+								</span>
+							</div>
+						{/each}
+					</div>
+				{:else}
 					<button
-						class="row open"
-						aria-expanded="true"
+						class="row"
+						aria-expanded="false"
 						onclick={(event) => unfold(event, row.v)}
 						>{@render venue(row)}</button
 					>
-					{#each [...row.parts].sort((a, b) => a.year - b.year) as part (part.year)}
-						<div class={["row part", { miss: !picked(part.t, row.v) }]}>
-							<span class="rank"></span>
-							<span class="entry">
-								{@render name("", `${part.year}`)}
-								<span class="figures">
-									<span class="score">{score(row.v, part.year)}</span>
-									<span class="strip">
-										{#each years as year (year)}
-											<span>{year === part.year ? part.t : "\u2007"}</span>
-										{/each}
-									</span>
-									<span class="num">{micro(part.n)}</span>
-								</span>
-							</span>
-						</div>
-					{/each}
-				</div>
-			{:else}
-				<button
-					class="row"
-					aria-expanded="false"
-					onclick={(event) => unfold(event, row.v)}>{@render venue(row)}</button
-				>
-			{/if}
-		{/each}
-	{/if}
-	{#if shown < size}
-		<div {@attach more(() => (shown += 200))}></div>
-	{/if}
-</main>
+				{/if}
+			{/each}
+		{/if}
+		{#if shown < size}
+			<div {@attach more(() => (shown += 200))}></div>
+		{/if}
+	</main>
+{/if}

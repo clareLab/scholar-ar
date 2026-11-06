@@ -1,7 +1,9 @@
 import { svelte } from "@sveltejs/vite-plugin-svelte";
 import { defineConfig } from "vite";
+import { about } from "./src/about/vite.ts";
 
 export default defineConfig({
 	base: "./",
-	plugins: [svelte()],
+	build: { license: { fileName: "licenses.md" } },
+	plugins: [about(), svelte()],
 });

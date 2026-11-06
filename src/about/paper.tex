@@ -1,0 +1,74 @@
+\documentclass[10pt]{article}
+\usepackage[a4paper,textwidth=6.3in,textheight=9.4in,headsep=0.3in,centering]{geometry}
+\usepackage{fontspec}
+\usepackage{unicode-math}
+\setmainfont{texgyretermes}[Extension=.otf,UprightFont=*-regular,BoldFont=*-bold,ItalicFont=*-italic,BoldItalicFont=*-bolditalic]
+\setmathfont{texgyretermes-math.otf}
+\setmonofont{texgyrecursor}[Extension=.otf,UprightFont=*-regular,BoldFont=*-bold,ItalicFont=*-italic,BoldItalicFont=*-bolditalic]
+$if(cjk)$
+\usepackage{xeCJK}
+\setCJKmainfont{NotoSerifCJKsc-Regular}[BoldFont=NotoSerifCJKsc-Bold]
+\setCJKmonofont{NotoSerifCJKsc-Regular}
+$endif$
+\usepackage{graphicx}
+\usepackage{placeins}
+\usepackage{xcolor}
+\usepackage{titlesec}
+\usepackage[labelfont=bf,labelsep=colon,font=small,skip=6pt,singlelinecheck=false]{caption}
+\usepackage{microtype}
+\usepackage{hyperref}
+\definecolor{link}{HTML}{1A4F8B}
+\hypersetup{colorlinks,linkcolor=link,citecolor=link,urlcolor=link,pdftitle={$title$},pdfauthor={clareLab}}
+\urlstyle{same}
+$if(cjk)$
+\usepackage{indentfirst}
+\captionsetup{labelsep=quad}
+\setlength{\parindent}{2em}
+$else$
+\setlength{\parindent}{0pt}
+$endif$
+\setlength{\parskip}{5.5pt}
+\setlength{\emergencystretch}{2em}
+\providecommand{\tightlist}{\setlength{\itemsep}{0pt}\setlength{\parskip}{0pt}}
+\providecommand{\pandocbounded}[1]{#1}
+\titleformat{\section}{\large\bfseries}{\thesection}{0.8em}{}
+\titleformat{\subsection}{\normalsize\bfseries}{\thesubsection}{0.8em}{}
+\titlespacing*{\section}{0pt}{14pt}{4pt}
+\titlespacing*{\subsection}{0pt}{10pt}{2pt}
+\renewcommand{\refname}{$refname$}
+\renewcommand{\figurename}{$figure$}
+\makeatletter
+\renewcommand{\@biblabel}[1]{[#1]}
+\setlength{\@fptop}{0pt}
+\setlength{\@fpsep}{\floatsep}
+\setlength{\@fpbot}{0pt plus 1fil}
+\makeatother
+\renewcommand{\topfraction}{0.9}
+\renewcommand{\textfraction}{0.1}
+\renewcommand{\floatpagefraction}{0.75}
+\makeatletter
+\renewcommand{\ps@plain}{\renewcommand{\@oddhead}{}\renewcommand{\@evenhead}{}\renewcommand{\@oddfoot}{\hfil\footnotesize\thepage\hfil}\renewcommand{\@evenfoot}{\@oddfoot}}
+\makeatother
+\pagestyle{plain}
+\begin{document}
+\special{pdf:minorversion 7}
+\thispagestyle{plain}
+\begin{center}
+\rule{\textwidth}{2pt}\par\vspace{10pt}
+{\LARGE\bfseries $title$\par}
+\vspace{8pt}\rule{\textwidth}{0.6pt}\par\vspace{16pt}
+{\large\bfseries clareLab\par}
+\vspace{2pt}
+{\normalsize\texttt{yaho@clarelab.moe}\par}
+\vspace{6pt}
+{\normalsize $date$\par}
+{\small $release$\par}
+\end{center}
+\vspace{10pt}
+\begin{center}{\large\bfseries $abstractname$}\end{center}
+\begin{quote}
+$abstract$
+\end{quote}
+\vspace{6pt}
+$body$
+\end{document}
