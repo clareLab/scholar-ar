@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { tick } from "svelte";
 	import {
 		credit,
 		type Group,
@@ -37,7 +38,7 @@
 		["ratio", "Per faculty"],
 	] as const;
 	const tiers = [1, 2, 3, 4];
-	const means = ["count", "faculty"] as const;
+	const means = ["count", "faculty", "venues"] as const;
 
 	type Tab = (typeof tabs)[number][0];
 	type Sort = (typeof sorts)[number][0];
@@ -54,6 +55,7 @@
 		tab: Tab;
 		sort: Sort;
 		inst?: number;
+		venue?: number;
 	};
 
 	const span = (from: number, to: number) =>
@@ -92,6 +94,7 @@
 			tab: tabs.find(([key]) => key === q.get("tab"))?.[0] ?? "institutions",
 			sort: sorts.find(([key]) => key === q.get("sort"))?.[0] ?? "count",
 			inst: q.has("inst") ? int("inst", -1) : undefined,
+			venue: q.has("venue") ? int("venue", -1) : undefined,
 		};
 	};
 
@@ -114,6 +117,7 @@
 		if (state.tab !== "institutions") parts.push(`tab=${state.tab}`);
 		if (state.sort !== "count") parts.push(`sort=${state.sort}`);
 		if (state.inst !== undefined) parts.push(`inst=${state.inst}`);
+		if (state.venue !== undefined) parts.push(`venue=${state.venue}`);
 		return location.pathname + (parts.length ? `?${parts.join("&")}` : "");
 	};
 
@@ -148,7 +152,11 @@
 	const above = $derived(new Set(s.above));
 	const place = $derived(new Map(institutions.id.map((id, k) => [id, k])));
 	const open = $derived(s.inst === undefined ? -1 : (place.get(s.inst) ?? -1));
+	const seat = $derived(
+		s.venue === undefined ? -1 : venues.id.indexOf(s.venue),
+	);
 	const within = (year: number) => year >= s.from && year <= s.to;
+	const land = (code: string) => at.size === lands.length || at.has(code);
 	const ends = (year: number) => year === s.to || year === s.from - 1;
 	const sign = (r: number, g: Group) => (g.year[r] === s.to ? 1 : -1);
 	const picked = (t: number, v: number) =>
@@ -235,6 +243,9 @@
 		name: string;
 	};
 
+	const mean = <T,>(rows: T[], value: (row: T) => number) =>
+		rows.reduce((sum, row) => sum + value(row), 0) / rows.length;
+
 	const rank = <T extends { rank: number }>(
 		rows: T[],
 		key: (row: T) => number,
@@ -259,11 +270,9 @@
 			credit(files ?? [], under, "i", () => true, sums, sign);
 		const people = total(faculty ?? [], size, "i", value("f"));
 		const rows: Row[] = [];
-		const every = at.size === lands.length;
 		for (let i = 0; i < size; i++) {
 			const n = sums[i];
-			if (n <= 0) continue;
-			if (!every && !at.has(institutions.country[i])) continue;
+			if (n <= 0 || !land(institutions.country[i])) continue;
 			const sum = people[i];
 			const f = sum / years.length;
 			rows.push({
@@ -276,9 +285,9 @@
 				name: institutions.name[i],
 			});
 		}
-		const mean = (key: Mean) =>
-			rows.reduce((sum, row) => sum + row[key], 0) / rows.length;
-		const floors = s.above.map((key) => [key, mean(key)] as const);
+		const floors = (["count", "faculty"] as const)
+			.filter((key) => above.has(key))
+			.map((key) => [key, mean(rows, (row) => row[key])] as const);
 		last = rank(
 			rows.filter((row) => floors.every(([key, m]) => row[key] > m)),
 			(row) => row[s.sort],
@@ -306,15 +315,20 @@
 		return out;
 	});
 
-	const holds = (list: number[] | undefined, [low, high]: number[]) => {
-		if (!list) return false;
+	const bound = (list: number[], value: number) => {
 		let lo = 0;
 		let hi = list.length;
 		while (lo < hi) {
 			const mid = (lo + hi) >> 1;
-			if (list[mid] < low) lo = mid + 1;
+			if (list[mid] < value) lo = mid + 1;
 			else hi = mid;
 		}
+		return lo;
+	};
+
+	const holds = (list: number[] | undefined, [low, high]: number[]) => {
+		if (!list) return false;
+		const lo = bound(list, low);
 		return lo < list.length && list[lo] <= high;
 	};
 
@@ -384,34 +398,67 @@
 		return n;
 	});
 
+	type Stock = {
+		v: number;
+		n: number;
+		rank: number;
+		tiers: string[];
+		parts: { year: number; t: number; n: number }[];
+	};
+
 	const stock = $derived.by(() => {
-		const rows = new Map<
-			number,
-			{ v: number; n: number; rank: number; tiers: string[] }
-		>();
+		const rows = new Map<number, Stock>();
 		for (const { year, v, tier: t, mass } of cells ?? []) {
 			for (let r = 0; r < v.length; r++) {
 				let row = rows.get(v[r]);
 				if (!row) {
-					row = { v: v[r], n: 0, rank: 0, tiers: years.map(() => "") };
+					const tiers = years.map(() => "");
+					row = { v: v[r], n: 0, rank: 0, tiers, parts: [] };
 					rows.set(v[r], row);
 				}
 				row.tiers[year[r] - s.from] = `${t[r]}`;
+				row.parts.push({ year: year[r], t: t[r], n: mass[r] });
 				if (picked(t[r], v[r])) row.n += mass[r];
 			}
 		}
+		const listed = [...rows.values()].filter(
+			(row) => row.n > 0 && land(venues.country[row.v]),
+		);
+		const floor = above.has("venues")
+			? mean(listed, (row) => row.n)
+			: Number.NEGATIVE_INFINITY;
 		return rank(
-			[...rows.values()].filter((row) => row.n > 0),
+			listed.filter((row) => row.n > floor),
 			(row) => row.n,
 			(a, b) => venues.name[a.v].localeCompare(venues.name[b.v]),
 		);
 	});
 
+	const scores = $derived(
+		seat < 0
+			? undefined
+			: take(`scores ${range}`, () =>
+					groups(`${release}/scores.parquet`, (stat) =>
+						within(stat("year")[0]),
+					),
+				),
+	);
+
+	const score = (v: number, year: number) => {
+		const group = scores?.find((g) => g.year[0] === year);
+		if (!group) return "";
+		const k = bound(group.v, v);
+		if (group.v[k] !== v) return "";
+		const n = group.score[k];
+		return `${Math.floor(n / 1e4)}.${`${n % 1e4}`.padStart(4, "0")}`;
+	};
+
 	const busy = $derived(
 		!ready ||
-			(open >= 0 &&
-				(!crew || !roster || known < Math.min(crowd, team.length)) &&
-				s.tab === "institutions"),
+			(s.tab === "institutions"
+				? open >= 0 &&
+					(!crew || !roster || known < Math.min(crowd, team.length))
+				: seat >= 0 && !scores),
 	);
 
 	const mark = (t: number) => {
@@ -461,6 +508,7 @@
 				children: shelf.listings[t - 1].map((l) => ({
 					id: l.key,
 					name: l.name,
+					code: venues.country[l.v],
 					children: [],
 				})),
 			})),
@@ -542,10 +590,37 @@
 	const ratio = (row: Row) =>
 		row.people ? hundredths(row.count * years.length, row.people) : "0.00";
 
-	const expand = (i: number) => {
-		const id = institutions.id[i];
-		s.inst = s.inst === id ? undefined : id;
+	const backs: Partial<Record<Tab, number>> = {};
+
+	const fold = async (event: MouseEvent, change: () => void) => {
+		const row = event.currentTarget as HTMLElement;
+		const shut = row.classList.contains("open");
+		const top = row.getBoundingClientRect().top;
+		const tab = s.tab;
+		change();
+		await tick();
+		const back = backs[tab];
+		if (shut) {
+			if (back !== undefined) scrollTo(0, back);
+			backs[tab] = undefined;
+			return;
+		}
+		const group = document.querySelector("main .group") as HTMLElement;
+		scrollBy(0, group.getBoundingClientRect().top - top);
+		backs[tab] = scrollY;
 	};
+
+	const expand = (event: MouseEvent, i: number) =>
+		fold(event, () => {
+			const id = institutions.id[i];
+			s.inst = s.inst === id ? undefined : id;
+		});
+
+	const unfold = (event: MouseEvent, v: number) =>
+		fold(event, () => {
+			const id = venues.id[v];
+			s.venue = s.venue === id ? undefined : id;
+		});
 
 	const csv = () => {
 		const cell = (value: string | number) =>
@@ -571,10 +646,11 @@
 						]),
 					]
 				: [
-						["Rank", "Venue", ...years, "Count"],
+						["Rank", "Venue", "Country", ...years, "Count"],
 						...stock.map((row) => [
 							row.rank,
 							venues.name[row.v],
+							venues.country[row.v],
 							...row.tiers,
 							micro(row.n),
 						]),
@@ -600,6 +676,35 @@
 		{:else}
 			<span class="flag"></span>
 		{/if}{text}
+	</span>
+{/snippet}
+
+{#snippet floor(key: Mean, title: string)}
+	<input
+		class="box"
+		type="checkbox"
+		{title}
+		aria-label={title}
+		checked={above.has(key)}
+		onchange={() =>
+			(s.above = means.filter((k) =>
+				k === key ? !above.has(k) : above.has(k),
+			))}
+	/>
+{/snippet}
+
+{#snippet venue(row: Stock)}
+	<span class="rank">{row.rank}</span>
+	<span class="entry">
+		{@render name(venues.country[row.v], venues.name[row.v])}
+		<span class="figures">
+			<span class="strip">
+				{#each row.tiers as t, y (y)}
+					<span>{t || "\u2007"}</span>
+				{/each}
+			</span>
+			<span class="num">{micro(row.n)}</span>
+		</span>
 	</span>
 {/snippet}
 
@@ -640,7 +745,7 @@
 	</div>
 </header>
 
-<Panel trees={[areas, shelves, nations]} />
+<Panel trees={[areas, nations, shelves]} />
 
 <main
 	class={[s.tab, { busy }]}
@@ -651,31 +756,33 @@
 		{#if s.tab === "institutions"}
 			<span class="rank">#</span><span class="title">Institution</span>
 			{#each sorts as [key, label] (key)}
-				<span class="sort">
-					{#if key !== "ratio"}
-						<button
-							class="mean"
-							aria-label="{label} above mean"
-							aria-pressed={above.has(key)}
-							onclick={() =>
-								(s.above = means.filter((k) =>
-									k === key ? !above.has(k) : above.has(k),
-								))}>&gt;</button
-						>
-					{/if}<button
-						class:on={s.sort === key}
-						aria-pressed={s.sort === key}
-						onclick={() => (s.sort = key)}>{label}</button
-					>
-				</span>
+				<span class="sort"
+					><span
+						>{#if key !== "ratio"}{@render floor(
+								key,
+								`Only institutions above the mean ${label}`,
+							)}{/if}<button
+							class:on={s.sort === key}
+							aria-pressed={s.sort === key}
+							onclick={() => (s.sort = key)}>{label}</button
+						></span
+					></span
+				>
 			{/each}
 		{:else}
 			<span class="rank">#</span>
 			<span class="entry">
-				<span class="name">Venue</span>
+				<span class="name title">Venue</span>
 				<span class="figures">
 					<span class="strip"><span class="num">Tier</span></span>
-					<span class="num">Count</span>
+					<span class="sort"
+						><span
+							>{@render floor(
+								"venues",
+								"Only venues above the mean Count",
+							)}Count</span
+						></span
+					>
 				</span>
 			</span>
 		{/if}
@@ -687,7 +794,8 @@
 					<button
 						class="row open"
 						aria-expanded="true"
-						onclick={() => expand(row.i)}>{@render line(row)}</button
+						onclick={(event) => expand(event, row.i)}
+						>{@render line(row)}</button
 					>
 					{#each team.slice(0, known) as person (person.a)}
 						{@const [id, label] = folk.get(person.a) ?? [0, ""]}
@@ -708,27 +816,48 @@
 					{/if}
 				</div>
 			{:else}
-				<button class="row" aria-expanded="false" onclick={() => expand(row.i)}
-					>{@render line(row)}</button
+				<button
+					class="row"
+					aria-expanded="false"
+					onclick={(event) => expand(event, row.i)}>{@render line(row)}</button
 				>
 			{/if}
 		{/each}
 	{:else}
 		{#each stock.slice(0, shown) as row (row.v)}
-			<div class="row">
-				<span class="rank">{row.rank}</span>
-				<span class="entry">
-					<span class="name">{venues.name[row.v]}</span>
-					<span class="figures">
-						<span class="strip">
-							{#each row.tiers as t, y (y)}
-								<span>{t || "\u2007"}</span>
-							{/each}
-						</span>
-						<span class="num">{micro(row.n)}</span>
-					</span>
-				</span>
-			</div>
+			{#if row.v === seat}
+				<div class="group">
+					<button
+						class="row open"
+						aria-expanded="true"
+						onclick={(event) => unfold(event, row.v)}
+						>{@render venue(row)}</button
+					>
+					{#each [...row.parts].sort((a, b) => a.year - b.year) as part (part.year)}
+						<div class={["row part", { miss: !picked(part.t, row.v) }]}>
+							<span class="rank"></span>
+							<span class="entry">
+								{@render name("", `${part.year}`)}
+								<span class="figures">
+									<span class="score">{score(row.v, part.year)}</span>
+									<span class="strip">
+										{#each years as year (year)}
+											<span>{year === part.year ? part.t : "\u2007"}</span>
+										{/each}
+									</span>
+									<span class="num">{micro(part.n)}</span>
+								</span>
+							</span>
+						</div>
+					{/each}
+				</div>
+			{:else}
+				<button
+					class="row"
+					aria-expanded="false"
+					onclick={(event) => unfold(event, row.v)}>{@render venue(row)}</button
+				>
+			{/if}
 		{/each}
 	{/if}
 	{#if shown < size}

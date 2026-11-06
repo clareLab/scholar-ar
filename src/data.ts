@@ -39,7 +39,7 @@ export type Institutions = {
 	ror: string[];
 };
 
-export type Venues = { id: number[]; name: string[] };
+export type Venues = { id: number[]; name: string[]; country: string[] };
 
 export type People = { a: number[]; name: string[] };
 

@@ -77,17 +77,11 @@
 		return out;
 	});
 
-	const items = $derived.by(() => {
-		if (query.trim())
-			return fuzzy(everyone, (t) => t.name, query).map((twig) => ({
-				twig,
-				hit: true,
-			}));
-		return [...ancestry(at), ...at.children].map((twig) => ({
-			twig,
-			hit: false,
-		}));
-	});
+	const path = $derived(query.trim() ? [] : ancestry(at));
+
+	const items = $derived(
+		query.trim() ? fuzzy(everyone, (t) => t.name, query) : at.children,
+	);
 
 	let shown = $derived.by(() => {
 		void list;
@@ -97,6 +91,11 @@
 	});
 
 	let scroller = $state<HTMLElement>();
+
+	$effect(() => {
+		void items;
+		if (scroller) scroller.scrollTop = 0;
+	});
 
 	const more = (sentinel: Element) => {
 		const watch = new IntersectionObserver(
@@ -133,6 +132,33 @@
 	};
 </script>
 
+{#snippet item(twig: Twig, below: boolean)}
+	{@const value = tree.mark(twig)}
+	{#if value === undefined}<span class="slot"></span>{:else}<input
+			class="box"
+			type="checkbox"
+			aria-label={twig.name}
+			checked={value === 2}
+			{@attach (box) => mixed(box, value === 1)}
+			onchange={() => tree.flip(twig)}
+		/>{/if}{#if tree.link}<a
+			class:miss={below && value === 0}
+			href={tree.link(twig)}
+			aria-current={twig === at && !below ? "page" : undefined}
+			onclick={(event) => enter(event, twig)}>{twig.name}</a
+		>{:else}<button
+			class:miss={below && value === 0}
+			class:flagged={twig.code !== undefined}
+			aria-current={twig === at && !below ? "true" : undefined}
+			onclick={() => (twig.children.length ? open(twig) : tree.flip(twig))}
+			>{#if twig.code !== undefined}{#if flag(twig.code)}<img
+						class="flag"
+						src={flag(twig.code)}
+						alt=""
+					/>{:else}<span class="flag"></span>{/if}{/if}{twig.name}</button
+		>{/if}
+{/snippet}
+
 <nav class={["panel", { shut }]}>
 	<input type="search" placeholder="Search" bind:value={query} />
 	<div class="lists">
@@ -144,35 +170,18 @@
 			>
 		{/each}
 	</div>
+	{#if path.length}
+		<ul class="path">
+			{#each path as twig (twig.id)}
+				<li class:up={twig !== at}>{@render item(twig, false)}</li>
+			{/each}
+		</ul>
+	{/if}
 	<ul bind:this={scroller}>
-		{#each items.slice(0, shown) as { twig, hit }, k (k)}
-			{@const value = tree.mark(twig)}
+		{#each items.slice(0, shown) as twig, k (k)}
 			<li>
-				{#if value === undefined}<span class="slot"></span>{:else}<input
-						class="box"
-						type="checkbox"
-						aria-label={twig.name}
-						checked={value === 2}
-						{@attach (box) => mixed(box, value === 1)}
-						onchange={() => tree.flip(twig)}
-					/>{/if}{#if tree.link}<a
-						class:miss={value === 0}
-						href={tree.link(twig)}
-						aria-current={twig === at && !hit ? "page" : undefined}
-						onclick={(event) => enter(event, twig)}>{twig.name}</a
-					>{:else}<button
-						class:miss={value === 0}
-						class:flagged={twig.code !== undefined}
-						aria-current={twig === at && !hit ? "true" : undefined}
-						onclick={() =>
-							twig.children.length ? open(twig) : tree.flip(twig)}
-						>{#if twig.code !== undefined}{#if flag(twig.code)}<img
-									class="flag"
-									src={flag(twig.code)}
-									alt=""
-								/>{:else}<span class="flag"></span>{/if}{/if}{twig.name}</button
-					>{/if}
-				{#if hit && twig.parent}
+				{@render item(twig, true)}
+				{#if query.trim() && twig.parent}
 					<span class="miss">{twig.parent.name}</span>
 				{/if}
 			</li>
