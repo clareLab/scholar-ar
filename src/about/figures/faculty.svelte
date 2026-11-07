@@ -1,18 +1,6 @@
 <script lang="ts">
 	import Frame from "../Frame.svelte";
-	import {
-		faint,
-		hair,
-		ink,
-		mute,
-		page,
-		type Props,
-		pointer,
-		scale,
-		size,
-		small,
-		soft,
-	} from "../plot";
+	import { hair, ink, mute, page, type Props, pointer, size } from "../plot";
 
 	let { words, print = false }: Props = $props();
 	let width = $state(0);
@@ -49,7 +37,7 @@
 	const num = (x: number) => `${+x.toFixed(4)}`;
 
 	const wide = $derived(W >= 600);
-	const aw = $derived(wide ? W * 0.52 : W);
+	const aw = $derived(wide ? W * 0.54 : W);
 	const row = 24;
 	const top = 26;
 	const leafY = (k: number) => top + k * row + 14;
@@ -60,29 +48,19 @@
 	const personY = (a: number) =>
 		middle(leaves.flatMap((l, k) => (papers[l.entry].person === a ? [k] : [])));
 	const xs = $derived([0, aw * 0.36, aw * 0.72]);
-	const tableTop = $derived(leafY(leaves.length - 1) + 22);
-	const aH = $derived(tableTop + 20 + 2 * row);
-	const columns = $derived([aw * 0.4, aw * 0.66, aw]);
+	const tx = $derived(wide ? aw + 64 : 0);
+	const tw = $derived(W - tx);
+	const tableTop = $derived(wide ? 0 : leafY(leaves.length - 1) + 22);
+	const columns = $derived([tx + tw * 0.4, tx + tw * 0.7, W]);
+	const H = $derived(
+		Math.max(leafY(leaves.length - 1) + 10, tableTop + 20 + 2 * row + 4),
+	);
 
-	const bx = $derived(wide ? aw + 48 : 0);
-	const by = $derived(wide ? 0 : aH + 24);
-	const bw = $derived(W - bx);
-	const bh = 200;
-	const left = 26;
-	const x = $derived(scale([0, 10], [bx + left, bx + bw - 8]));
-	const y = $derived(scale([0, 10], [by + 34 + bh, by + 34]));
-	const H = $derived(Math.max(aH, by + 34 + bh + 40));
-
-	let k = $state(1);
 	let hover = $state<string>();
 	const move = (event: PointerEvent) => {
 		const [px, py] = pointer(event);
 		hover = undefined;
-		if (px >= bx + left && py >= by) {
-			const pick = Math.round((px - bx - left) / ((bw - left - 10) / 10));
-			if (pick >= 0 && pick <= 10 && !print) hover = `k${pick}`;
-			return;
-		}
+		if (px > aw + 8) return;
 		const hit = leaves.findIndex(
 			(_, j) => Math.abs(py - leafY(j) + 4) < row / 2,
 		);
@@ -95,7 +73,6 @@
 		}
 	};
 
-	const shown = $derived(hover?.startsWith("k") ? Number(hover.slice(1)) : k);
 	const readout = $derived.by(() => {
 		if (hover?.startsWith("l")) {
 			const l = leaves[Number(hover.slice(1))];
@@ -107,22 +84,11 @@
 			const s = shares[p.paper];
 			return say.entry(people[p.person], p.paper + 1, num(p.part), s, children);
 		}
-		return say.idle(shown);
+		return say.idle(totals.map((t) => [t.place, num(t.total)]));
 	});
 </script>
 
 <Frame {print} bind:width {readout}>
-	{#snippet controls()}
-		<label class="slide"
-			>{say.slider}<input
-				type="range"
-				min="0"
-				max="10"
-				step="1"
-				bind:value={k}
-			/></label
-		>
-	{/snippet}
 	<svg
 		xmlns="http://www.w3.org/2000/svg"
 		viewBox="0 0 {W} {H}"
@@ -165,69 +131,19 @@
 			<text x={xs[1]} y={paperY(j)}>{p.paper + 1}</text>
 			<text x={xs[1] + 48} y={paperY(j)} text-anchor="end">{num(p.part)}</text>
 		{/each}
-		<text x={0} y={tableTop + 14} fill={mute}>{say.authors}</text>
+		<text x={tx} y={tableTop + 14} fill={mute}>{say.authors}</text>
 		{#each [say.total, ...children] as head, c (head)}
 			<text x={columns[c]} y={tableTop + 14} fill={mute} text-anchor="end"
 				>{head}</text
 			>
 		{/each}
-		<line x1={0} x2={aw} y1={tableTop + 20} y2={tableTop + 20} stroke={ink} />
+		<line x1={tx} x2={W} y1={tableTop + 20} y2={tableTop + 20} stroke={ink} />
 		{#each totals as t, r (t.place)}
 			{@const y = tableTop + 20 + (r + 1) * row - 6}
-			<text x={0} {y}>{t.place}</text>
+			<text x={tx} {y}>{t.place}</text>
 			{#each [t.total, ...t.parts] as part, c (c)}
 				<text x={columns[c]} {y} text-anchor="end">{num(part)}</text>
 			{/each}
 		{/each}
-
-		<text x={bx} y={by + 14} fill={mute}>{say.per}</text>
-		{#each [0, 5, 10] as t (t)}
-			<line
-				x1={x(0)}
-				x2={x(10)}
-				y1={y(t)}
-				y2={y(t)}
-				stroke={t ? faint : mute}
-			/>
-			<text
-				x={x(0) - 6}
-				y={y(t) + 4}
-				fill={mute}
-				font-size={small}
-				text-anchor="end">{t}</text
-			>
-			<text
-				x={x(t)}
-				y={y(0) + 17}
-				fill={mute}
-				font-size={small}
-				text-anchor="middle">{t}</text
-			>
-		{/each}
-		<line
-			x1={x(1)}
-			x2={x(10)}
-			y1={y(10)}
-			y2={y(10)}
-			stroke={soft}
-			stroke-width={1.6}
-		/>
-		<line
-			x1={x(0)}
-			x2={x(10)}
-			y1={y(0)}
-			y2={y(10)}
-			stroke={ink}
-			stroke-width={1.6}
-		/>
-		<text x={x(5.4)} y={y(6)} text-anchor="end">{say.all}</text>
-		<text x={x(10)} y={y(10) - 8} fill={mute} text-anchor="end">{say.t1}</text>
-		<circle cx={x(shown)} cy={y(shown)} r={4} fill={ink} />
-		{#if shown}
-			<circle cx={x(shown)} cy={y(10)} r={4} fill={soft} />
-		{/if}
-		<text x={bx + bw} y={y(0) + 36} fill={mute} text-anchor="end"
-			>{say.axis}</text
-		>
 	</svg>
 </Frame>

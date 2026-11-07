@@ -279,8 +279,8 @@ main {
 .row {
   display: grid;
   grid-template-columns:
-    var(--rank) minmax(0, 1fr) var(--count) var(--count)
-    var(--count);
+    var(--rank) minmax(0, 1fr) max(var(--w1), 3.9em) max(var(--w2), 4.6em)
+    max(var(--w3), 4.2em) max(var(--w4), 2.8em);
   align-items: baseline;
   column-gap: var(--gap);
   width: 100%;
@@ -373,7 +373,7 @@ main {
 
 .num {
   white-space: nowrap;
-  direction: rtl;
+  text-align: right;
 }
 
 .name {
@@ -438,6 +438,7 @@ main {
     grid-column: 1 / -1;
     justify-self: end;
     width: 0;
+    direction: rtl;
   }
 }
 
@@ -524,6 +525,12 @@ main {
     padding: var(--line) 0 40px;
   }
 
+  .row {
+    grid-template-columns:
+      var(--rank) minmax(max(var(--w1), 3.9em), 1fr) max(var(--w2), 4.6em)
+      max(var(--w3), 4.2em) max(var(--w4), 2.8em);
+  }
+
   .row > :nth-child(2) {
     grid-column: 2 / -1;
   }
@@ -533,18 +540,30 @@ main {
   }
 
   .row > :nth-child(3) {
-    grid-column: 3;
+    grid-column: 2;
   }
 
   .row > :nth-child(4) {
-    grid-column: 4;
+    grid-column: 3;
   }
 
   .row > :nth-child(5) {
+    grid-column: 4;
+  }
+
+  .row > :nth-child(6) {
     grid-column: 5;
   }
 
   .head {
     white-space: normal;
+  }
+}
+
+@media (width < 360px) {
+  main.institutions {
+    --gap: 0.6em;
+
+    font-size: 13px;
   }
 }

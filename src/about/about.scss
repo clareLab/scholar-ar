@@ -201,6 +201,20 @@ $phone: 760px;
     overflow: auto hidden;
   }
 
+  .equations {
+    display: flex;
+    flex-wrap: wrap;
+    column-gap: 2.4em;
+    justify-content: center;
+    margin: 11px 0;
+
+    .katex-display {
+      min-width: 0;
+      max-width: 100%;
+      margin: 0;
+    }
+  }
+
   figure {
     margin: 33px 0;
     scroll-margin-top: calc(var(--stack) + 16px);
@@ -307,7 +321,7 @@ $phone: 760px;
     color: var(--mute);
     white-space: nowrap;
 
-    .name {
+    .who {
       min-width: 0;
       overflow: hidden;
       text-overflow: ellipsis;
@@ -444,7 +458,7 @@ $phone: 760px;
     height: calc(3 * var(--line));
     white-space: normal;
 
-    .name {
+    .who {
       overflow: visible;
     }
   }

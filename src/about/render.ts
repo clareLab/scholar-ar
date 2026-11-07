@@ -42,10 +42,33 @@ const slug = (text: string) =>
 		.replace(/[^\p{L}\p{N}]+/gu, "-")
 		.replace(/^-|-$/g, "");
 
+const apart = (source: string) => {
+	if (source.includes("\\begin{")) return [source];
+	const parts: string[] = [];
+	let depth = 0;
+	let from = 0;
+	for (let k = 0; k < source.length; k++) {
+		if (source.startsWith("\\qquad", k) && depth === 0) {
+			parts.push(source.slice(from, k).trim());
+			from = k + "\\qquad".length;
+		} else if (source[k] === "\\") k++;
+		else if (source[k] === "{") depth++;
+		else if (source[k] === "}") depth--;
+	}
+	return [...parts, source.slice(from).trim()];
+};
+
 export const paper = (text: string, words: Words): Paper => {
 	const maths: string[] = [];
-	const keep = (tex: string, displayMode: boolean) => {
-		maths.push(katex.renderToString(tex, { displayMode, throwOnError: true }));
+	const tex = (source: string, displayMode: boolean) =>
+		katex.renderToString(source, { displayMode, throwOnError: true });
+	const keep = (source: string, displayMode: boolean) => {
+		const parts = displayMode ? apart(source) : [source];
+		maths.push(
+			parts.length > 1
+				? `<div class="equations">${parts.map((part) => tex(part, true)).join("")}</div>`
+				: tex(source, displayMode),
+		);
 		return `%%${maths.length - 1}%%`;
 	};
 	const { meta, body } = front(

@@ -23,7 +23,7 @@
 	const W = $derived(print ? page : width);
 
 	const say = $derived(words.composition);
-	let sort = $state<"field" | "share">("field");
+	let sort = $state<"field" | "share">("share");
 	const rows = $derived.by(() => {
 		const sum = (m: number[]) => m.reduce((a, b) => a + b, 0);
 		const list = order(
@@ -97,8 +97,8 @@
 	{#snippet controls()}
 		<Switch
 			options={[
-				["field", say.field],
 				["share", say.share],
+				["field", say.field],
 			]}
 			bind:value={sort}
 		/>

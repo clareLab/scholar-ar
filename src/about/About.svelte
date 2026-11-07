@@ -12,7 +12,6 @@
 	import countries from "./figures/countries.svelte";
 	import faculty from "./figures/faculty.svelte";
 	import scaling from "./figures/scaling.svelte";
-	import stability from "./figures/stability.svelte";
 	import tiers from "./figures/tiers.svelte";
 	import validity from "./figures/validity.svelte";
 	import type { Props } from "./plot";
@@ -31,7 +30,6 @@
 		validity,
 		concentration,
 		countries,
-		stability,
 		scaling,
 	};
 

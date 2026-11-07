@@ -348,6 +348,56 @@ export const count = (
 	return sums;
 };
 
+export const expect = (counts: Float64Array, people: Float64Array) => {
+	const index: number[] = [];
+	const logs: number[] = [];
+	let total = 0;
+	let weighted = 0;
+	for (let i = 0; i < counts.length; i++) {
+		if (people[i] <= 0) continue;
+		const l = Math.log(people[i]);
+		index.push(i);
+		logs.push(l);
+		total += counts[i];
+		weighted += counts[i] * l;
+	}
+	const out = new Float64Array(counts.length);
+	if (!total) return out;
+	let low = Number.POSITIVE_INFINITY;
+	let high = Number.NEGATIVE_INFINITY;
+	for (const l of logs) {
+		low = Math.min(low, l);
+		high = Math.max(high, l);
+	}
+	const weights = (beta: number) => {
+		const shift = beta * (beta > 0 ? high : low);
+		return logs.map((l) => Math.exp(beta * l - shift));
+	};
+	const mean = (beta: number) => {
+		const w = weights(beta);
+		let sum = 0;
+		let at = 0;
+		w.forEach((x, k) => {
+			sum += x;
+			at += x * logs[k];
+		});
+		return at / sum;
+	};
+	let lo = -10;
+	let hi = 10;
+	for (let k = 0; k < 50; k++) {
+		const mid = (lo + hi) / 2;
+		if (mean(mid) < weighted / total) lo = mid;
+		else hi = mid;
+	}
+	const w = weights((lo + hi) / 2);
+	const sum = w.reduce((a, x) => a + x, 0);
+	w.forEach((x, k) => {
+		out[index[k]] = (total * x) / sum;
+	});
+	return out;
+};
+
 export const hundredths = (num: number, den: number) =>
 	(Math.round((100 * num) / den) / 100).toFixed(2);
 

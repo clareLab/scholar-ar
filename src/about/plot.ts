@@ -8,7 +8,7 @@ export const mute = "#666";
 export const hair = "#ccc";
 export const faint = "#ececec";
 export const soft = "#9a9a9a";
-export const ramp = ["#163d6e", "#3f6fae", "#8aaad6", "#d0dcec"];
+export const ramp = ["#163d6e", "#3f6fae", "#84a3cf", "#c4d3e8"];
 export const size = 14;
 export const small = 13;
 export const row = 20;
@@ -38,7 +38,7 @@ export const ticks = (lo: number, hi: number, count = 5) => {
 };
 
 export const logTicks = (lo: number, hi: number) => {
-	const steps = Math.log10(hi / lo) <= 2.2 ? [1, 2, 5] : [1];
+	const steps = Math.log10(hi / lo) <= 2.5 ? [1, 2, 5] : [1];
 	const out: number[] = [];
 	for (let e = Math.floor(Math.log10(lo)); e <= Math.ceil(Math.log10(hi)); e++)
 		for (const m of steps) {

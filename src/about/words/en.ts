@@ -72,11 +72,6 @@ export const en = {
 		institution: "Institution",
 		authors: "Authors",
 		total: "Total",
-		per: "Per author",
-		all: "Authors from all papers",
-		t1: "Authors from T1 papers",
-		slider: "T1 papers",
-		axis: "T1 papers of 10",
 		leaf: (p: string, n: number, place: string, part: string) =>
 			`Person ${p}, paper ${n}, ${place}: ${part} of a person-year`,
 		entry: (
@@ -87,8 +82,8 @@ export const en = {
 			children: string[],
 		) =>
 			`Person ${p}, paper ${n}: ${part}, split ${s[0]} to ${children[0]} and ${s[1]} to ${children[1]}`,
-		idle: (n: number) =>
-			`${plural(n, "T1 paper", "T1 papers")} of 10: Per author ${n} with Authors 1, and ${n ? 10 : 0} with Authors ${n / 10}`,
+		idle: (rows: string[][]) =>
+			`Two person-years: ${rows.map(([place, part]) => `${place} ${part}`).join(", ")}`,
 	},
 	composition: {
 		field: "Field",
@@ -117,25 +112,19 @@ export const en = {
 		item: (name: string, year: number, share: string) =>
 			`${name}, ${year}: ${share} of T1 Count`,
 	},
-	stability: {
-		axis: "Spearman correlation with the previous year",
-		short: "Spearman ρ with the previous year",
-		mean: (mean: string, from: number, to: number) =>
-			`: mean ${mean} over ${from} to ${to}`,
-		year: (from: number, to: number, rho: string) =>
-			`, ${from} to ${to}: ${rho}`,
-	},
+
 	scaling: {
-		count: (view: string) => `Count, ${view}`,
+		count: "Count",
 		authors: "Authors",
-		slope: "Slope",
-		fit: (n: string, slope: string) =>
-			`Fit over ${n} institutions, slope ${slope}`,
-		short: (slope: string) => `Fit, slope ${slope}`,
-		point: (c: string, f: string, r: string) =>
-			`: Count ${c}, Authors ${f}, Per author ${r}`,
-		row: (slope: string, r2: string, n: string) =>
-			`: slope ${slope}, R² ${r2}, ${n} institutions`,
+		beta: "β",
+		expected: (beta: string) => `Expected, β = ${beta}`,
+		mean: "Mean Count per bin, zeros included",
+		zeros: "Share with zero Count",
+		point: (c: string, a: string, e: string, x: string) =>
+			`: Count ${c}, Authors ${a}, Expected ${e}, Excess ${x}`,
+		bin: (lo: string, hi: string, n: string, z: string, m: string) =>
+			`Authors ${lo} to ${hi}: ${n} institutions, ${z} with zero Count, mean Count ${m}`,
+		row: (beta: string, n: string) => `: β ${beta}, ${n} institutions`,
 	},
 };
 

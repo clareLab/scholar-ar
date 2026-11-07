@@ -51,9 +51,18 @@ local function references(div)
 end
 
 local function unhead(doc)
+  local last
+  for k, block in ipairs(doc.blocks) do
+    if block.t == "Header" and block.level == 1 and not block.classes:includes("unnumbered") then
+      last = k
+    end
+  end
   local out = {}
   for k, block in ipairs(doc.blocks) do
     local after = doc.blocks[k + 1]
+    if k == last then
+      table.insert(out, pandoc.RawBlock("latex", "\\FloatBarrier"))
+    end
     if not (block.t == "Header" and after and after.t == "Div" and after.identifier == "refs") then
       table.insert(out, block)
     end
@@ -67,7 +76,7 @@ return {
   { Cite = cite },
   {
     Header = function(h)
-      if h.level == 1 then
+      if h.level == 1 and h.classes:includes("unnumbered") then
         return { pandoc.RawBlock("latex", "\\FloatBarrier"), h }
       end
     end,

@@ -22,6 +22,7 @@
 		size,
 		small,
 		ticks,
+		wrap,
 	} from "../plot";
 	import Switch from "../Switch.svelte";
 
@@ -63,11 +64,48 @@
 		return out;
 	});
 	const listTop = $derived((keys.at(-1)?.y ?? axis) + 27);
-	const cols = $derived(Math.max(1, Math.min(3, Math.floor((W + 24) / 344))));
-	const named = $derived(ex.named);
-	const rows = $derived(Math.ceil(named.length / cols));
-	const entry = $derived(print ? 17 : 19);
-	const H = $derived(listTop + 24 + rows * entry);
+	const cols = $derived(W >= 560 ? 2 : 1);
+	const named = $derived(ex.named.slice(0, cols > 1 ? 20 : 12));
+	const entry = $derived(print ? 16 : 18);
+	const colW = $derived((W - 24 * (cols - 1)) / cols);
+	const rankW = $derived(measure(grouped(ex.cuts[0]), size) + 4);
+	const massW = $derived(
+		Math.max(
+			measure(say.mass, size),
+			measure(named[0]?.mass.toFixed(1) ?? "", size),
+		) + 4,
+	);
+	const phiW = $derived(measure("0.00", size) + 4);
+	const phiX = $derived(colW - massW - 14);
+	const nameX = $derived(rankW + 10);
+	const nameW = $derived(phiX - phiW - 14 - nameX);
+	const cells = $derived.by(() => {
+		const sized = named.map((v) => {
+			const all = wrap(v.name, nameW);
+			const lines = all.slice(0, 3);
+			if (all.length > 3) lines[2] = fit(all.slice(2).join(" "), nameW);
+			return { lines, h: entry * lines.length + 4 };
+		});
+		const total = sized.reduce((a, c) => a + c.h, 0);
+		let cut = sized.length;
+		if (cols > 1) {
+			let best = Number.POSITIVE_INFINITY;
+			let run = 0;
+			sized.forEach((c, j) => {
+				run += c.h;
+				const tallest = Math.max(run, total - run);
+				if (tallest < best) [best, cut] = [tallest, j + 1];
+			});
+		}
+		let y = 0;
+		return sized.map((c, j) => {
+			if (j === 0 || j === cut) y = listTop + 26;
+			const at = { ...c, x: j < cut ? 0 : colW + 24, y };
+			y += c.h;
+			return at;
+		});
+	});
+	const H = $derived(Math.max(...cells.map((c) => c.y + c.h)) + 2);
 
 	const floor = $derived(
 		10 **
@@ -120,20 +158,6 @@
 		}),
 	);
 
-	const colW = $derived((W - 24 * (cols - 1)) / cols);
-	const cell = (j: number) => ({
-		x: Math.floor(j / rows) * (colW + 24),
-		y: listTop + 24 + (j % rows) * entry,
-	});
-	const rankW = $derived(measure(grouped(ex.cuts[0]), size) + 4);
-	const massW = $derived(
-		Math.max(
-			measure(say.mass, size),
-			measure(named[0]?.mass.toFixed(1) ?? "", size),
-		) + 4,
-	);
-	const phiX = $derived(colW - massW - 16);
-
 	let hover = $state<number>();
 	const move = (event: PointerEvent) => {
 		const [px, py] = pointer(event);
@@ -143,10 +167,10 @@
 			return;
 		}
 		if (py > listTop + 24) {
-			const c = Math.floor(px / (colW + 24));
-			const r = Math.floor((py - listTop - 24) / entry);
-			const j = c * rows + r;
-			hover = j < named.length && r < rows ? named[j].rank : undefined;
+			const j = cells.findIndex(
+				(c) => px >= c.x && px < c.x + colW + 24 && py >= c.y && py < c.y + c.h,
+			);
+			hover = j >= 0 ? named[j].rank : undefined;
 			return;
 		}
 		hover = undefined;
@@ -282,7 +306,7 @@
 				fill={mute}
 				text-anchor="end">{say.rank}</text
 			>
-			<text x={c * (colW + 24) + rankW + 10} y={listTop + 14} fill={mute}
+			<text x={c * (colW + 24) + nameX} y={listTop + 14} fill={mute}
 				>{say.venue}</text
 			>
 			<text
@@ -306,30 +330,22 @@
 			/>
 		{/each}
 		{#each named as v, j (j)}
-			{@const at = cell(j)}
+			{@const at = cells[j]}
 			{@const on = hover === undefined || hover === v.rank}
-			<text
-				x={at.x + rankW}
-				y={at.y + entry / 2 + 4.5}
-				text-anchor="end"
-				fill={mute}>{grouped(v.rank)}</text
+			{@const base = at.y + entry / 2 + 6.5}
+			<text x={at.x + rankW} y={base} text-anchor="end" fill={mute}
+				>{grouped(v.rank)}</text
 			>
-			<text
-				x={at.x + rankW + 10}
-				y={at.y + entry / 2 + 4.5}
-				fill={on ? ink : mute}>{fit(v.name, phiX - rankW - 10 - 52)}</text
+			{#each at.lines as line, l (l)}
+				<text x={at.x + nameX} y={base + entry * l} fill={on ? ink : mute}
+					>{line}</text
+				>
+			{/each}
+			<text x={at.x + phiX} y={base} text-anchor="end" fill={on ? ink : mute}
+				>{v.phi.toFixed(2)}</text
 			>
-			<text
-				x={at.x + phiX}
-				y={at.y + entry / 2 + 4.5}
-				text-anchor="end"
-				fill={on ? ink : mute}>{v.phi.toFixed(2)}</text
-			>
-			<text
-				x={at.x + colW}
-				y={at.y + entry / 2 + 4.5}
-				text-anchor="end"
-				fill={on ? ink : mute}>{v.mass.toFixed(1)}</text
+			<text x={at.x + colW} y={base} text-anchor="end" fill={on ? ink : mute}
+				>{v.mass.toFixed(1)}</text
 			>
 		{/each}
 	</svg>

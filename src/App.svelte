@@ -9,6 +9,7 @@
 		type Group,
 		groups,
 		having,
+		expect,
 		hundredths,
 		leaves,
 		type Meta,
@@ -50,6 +51,7 @@
 		["count", "Count"],
 		["authors", "Authors"],
 		["ratio", "Per author"],
+		["excess", "Excess"],
 	] as const;
 	const tiers = [1, 2, 3, 4];
 	const means = ["count", "authors", "venues"] as const;
@@ -107,12 +109,10 @@
 			at: q.has("in")
 				? lands.filter((code) => list(q.get("in")).includes(code))
 				: lands,
-			above: means.filter(
-				(key) => !q.has("above") || list(q.get("above")).includes(key),
-			),
+			above: means.filter((key) => list(q.get("above")).includes(key)),
 			tab: tabs.find(([key]) => key === q.get("tab"))?.[0] ?? "institutions",
 			lang: langs.find((key) => key === q.get("lang")) ?? "en",
-			sort: sorts.find(([key]) => key === q.get("sort"))?.[0] ?? "count",
+			sort: sorts.find(([key]) => key === q.get("sort"))?.[0] ?? "excess",
 			inst: q.has("inst") ? int("inst", -1) : undefined,
 			venue: q.has("venue") ? int("venue", -1) : undefined,
 		};
@@ -129,12 +129,11 @@
 		if (state.off.length) parts.push(`off=${state.off.join(",")}`);
 		if (state.at.length !== lands.length)
 			parts.push(`in=${state.at.join(",")}`);
-		if (state.above.length !== means.length)
-			parts.push(`above=${state.above.join(",")}`);
+		if (state.above.length) parts.push(`above=${state.above.join(",")}`);
 		if (state.tab !== "institutions") parts.push(`tab=${state.tab}`);
 		if (state.tab === "about" && state.lang !== "en")
 			parts.push(`lang=${state.lang}`);
-		if (state.sort !== "count") parts.push(`sort=${state.sort}`);
+		if (state.sort !== "excess") parts.push(`sort=${state.sort}`);
 		if (state.inst !== undefined) parts.push(`inst=${state.inst}`);
 		if (state.venue !== undefined) parts.push(`venue=${state.venue}`);
 		return location.pathname + (parts.length ? `?${parts.join("&")}` : "");
@@ -246,6 +245,7 @@
 		authors: number;
 		people: number;
 		ratio: number;
+		excess: number;
 		name: string;
 	};
 
@@ -275,6 +275,7 @@
 			size,
 		);
 		const people = tally(faculty ?? [[], []], size, "f", off);
+		const expected = expect(sums, people);
 		const rows: Row[] = [];
 		for (let i = 0; i < size; i++) {
 			const n = sums[i];
@@ -288,6 +289,7 @@
 				authors: f,
 				people: sum,
 				ratio: f ? n / f : 0,
+				excess: n - expected[i],
 				name: institutions.name[i],
 			});
 		}
@@ -599,6 +601,32 @@
 		return 200;
 	});
 
+	const wide = (v: number) =>
+		(v < 9.995 ? 1 : Math.floor(Math.log10(v + 0.005)) + 1) + 2.5;
+
+	const widths = $derived.by(() => {
+		let [count, authors, ratio, high, low] = [0, 0, 0, 0, 0];
+		for (const row of table) {
+			count = Math.max(count, row.count);
+			authors = Math.max(authors, row.authors);
+			ratio = Math.max(ratio, row.ratio);
+			high = Math.max(high, row.excess);
+			low = Math.min(low, row.excess);
+		}
+		return [
+			wide(count / 1e6),
+			wide(authors / 1e6),
+			wide(ratio),
+			Math.max(wide(high / 1e6), wide(-low / 1e6)) + 1.13,
+		].map((w) => `${w}ch`);
+	});
+
+	const signed = (n: number) => {
+		const text = micro(Math.abs(n));
+		if (n > 0) return `+${text}`;
+		return n < 0 ? `\u2212${text}` : `\u2007${text}`;
+	};
+
 	const ratio = (row: Row) =>
 		row.people ? hundredths(row.count * years.length, row.people) : "0.00";
 
@@ -730,6 +758,7 @@
 							"Count",
 							"Authors",
 							"Per author",
+							"Excess",
 						],
 						...table.map((row) => [
 							row.rank,
@@ -738,6 +767,7 @@
 							micro(row.count),
 							micro(row.authors),
 							ratio(row),
+							micro(row.excess),
 						]),
 					]
 				: [
@@ -822,6 +852,7 @@
 	<span class="num">{micro(row.count)}</span>
 	<span class="num">{micro(row.authors)}</span>
 	<span class="num">{row.authors ? ratio(row) : ""}</span>
+	<span class="num">{signed(row.excess)}</span>
 {/snippet}
 
 <header class="bar">
@@ -906,6 +937,10 @@
 		class={[s.tab, { busy }]}
 		style:--years={years.length}
 		style:--digits={String(size).length}
+		style:--w1={widths[0]}
+		style:--w2={widths[1]}
+		style:--w3={widths[2]}
+		style:--w4={widths[3]}
 	>
 		<div class="row head">
 			{#if s.tab === "institutions"}
@@ -913,7 +948,7 @@
 				{#each sorts as [key, label] (key)}
 					<span class="sort"
 						><span
-							>{#if key !== "ratio"}{@render floor(
+							>{#if key === "count" || key === "authors"}{@render floor(
 									key,
 									`Only institutions above the mean ${label}`,
 								)}{/if}<button

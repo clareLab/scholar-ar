@@ -13,6 +13,7 @@
 		pointer,
 		room,
 		size,
+		soft,
 		wrap,
 	} from "../plot";
 	import Switch from "../Switch.svelte";
@@ -111,7 +112,7 @@
 			for (let w = Math.min(low, need[c]); ; w += 2) {
 				const lines = list.map((n) => wrap(n, w - num - 6).length);
 				const n = lines.reduce((a, b) => a + b, 0);
-				const fits = lines.every((l) => l <= 3) || w >= need[c];
+				const fits = lines.every((l) => l <= 4) || w >= need[c];
 				if (fits && (!out.length || n < out[out.length - 1].n))
 					out.push({ w, h: n * lead + 8 * list.length, n });
 				if (w >= need[c] || n === list.length) break;
@@ -146,8 +147,8 @@
 			let y = top;
 			const items = levels[lv].map((item) => {
 				const all = wrap(item.name, w - num - 6);
-				const lines = all.slice(0, 3);
-				if (all.length > 3) lines[2] = fit(all.slice(2).join(" "), w - num - 6);
+				const lines = all.slice(0, 4);
+				if (all.length > 4) lines[3] = fit(all.slice(3).join(" "), w - num - 6);
 				const at = { ...item, lines, y, h: lead * lines.length + 8 };
 				y += at.h;
 				return at;
@@ -182,16 +183,18 @@
 		return out;
 	};
 
-	let hover = $state<string>();
-	const lit = $derived.by(() => {
-		if (!hover) return new Set<string>();
-		const out = new Set(chain(hover));
+	const reach = (key: string) => {
+		const out = new Set(chain(key));
 		for (const t of levels.topic) {
 			const c = chain(t.key);
-			if (c.includes(hover)) for (const key of c) out.add(key);
+			if (c.includes(key)) for (const k of c) out.add(k);
 		}
 		return out;
-	});
+	};
+
+	let hover = $state<string>();
+	const trail = $derived(reach(`f${about.tier_example.view.split("/")[1]}`));
+	const lit = $derived(hover ? reach(hover) : trail);
 
 	const target = (item: Item) => {
 		let up = item.up;
@@ -265,8 +268,13 @@
 		onpointerdown={move}
 		onpointerleave={() => (hover = undefined)}
 	>
-		{#each links as link (link.key)}
-			<path d={link.d} fill="none" stroke={link.on ? ink : hair} />
+		{#each [...links].sort((a, b) => Number(a.on) - Number(b.on)) as link (link.key)}
+			<path
+				d={link.d}
+				fill="none"
+				stroke={link.on ? ink : hair}
+				stroke-width={link.on ? 1.25 : 1}
+			/>
 		{/each}
 		{#each columns as col (col.level)}
 			<text x={col.x} y={14} fill={mute}>{say[col.level]}</text>
@@ -280,6 +288,7 @@
 			<line x1={col.x} x2={col.x + col.w} y1={20.5} y2={20.5} stroke={hair} />
 			{#each col.items as item (item.key)}
 				{@const on = !hover || lit.has(item.key)}
+				{@const strong = lit.has(item.key)}
 				{#each item.lines as text, l (l)}
 					<text x={col.x} y={item.y + 13 + lead * l} fill={on ? ink : mute}
 						>{text}</text
@@ -303,7 +312,7 @@
 					y={item.y + item.h - 6}
 					width={(col.w * item.k) / ex.K}
 					height={4}
-					fill={hover && !on ? hair : ink}
+					fill={strong ? ink : hover ? hair : soft}
 				/>
 			{/each}
 		{/each}

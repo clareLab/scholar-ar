@@ -13,7 +13,6 @@ type Slope = {
 	name: string;
 	slope: number;
 	intercept: number;
-	r2: number;
 	n: number;
 };
 
@@ -133,7 +132,24 @@ export type About = {
 		rows: Slope[];
 		high: Slope;
 		low: Slope;
-		example: { view: View; points: [string, number, number][] };
+		top: {
+			name: string;
+			count: number;
+			authors: number;
+			expected: number;
+			excess: number;
+		}[];
+		example: {
+			view: View;
+			points: [string, number, number][];
+			bins: {
+				lo: number;
+				hi: number;
+				n: number;
+				zeros: number;
+				mean: number;
+			}[];
+		};
 	};
 };
 

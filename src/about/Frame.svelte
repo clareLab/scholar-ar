@@ -29,7 +29,7 @@
 		<div class="controls">
 			{@render controls?.()}
 			<span class="readout"
-				>{#if typeof readout === "string"}{readout}{:else}<span class="name"
+				>{#if typeof readout === "string"}{readout}{:else}<span class="who"
 						>{readout[0]}</span
 					><span>{readout[1]}</span>{/if}</span
 			>

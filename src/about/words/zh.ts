@@ -19,7 +19,7 @@ export const zh: Words = {
 	area: "范围",
 	log: "对数",
 	linear: "线性",
-	blank: "无国家",
+	blank: "国家为空",
 	other: "其他国家",
 	apportion: {
 		topic: "主题",
@@ -63,16 +63,11 @@ export const zh: Words = {
 		institution: "机构",
 		authors: "Authors",
 		total: "合计",
-		per: "Per author",
-		all: "由全部论文得出的 Authors",
-		t1: "只由 T1 论文得出的 Authors",
-		slider: "T1 论文",
-		axis: "10 篇论文中的 T1 篇数",
 		leaf: (p, n, place, part) => `人员 ${p}，论文 ${n}，${place}：${part} 人年`,
 		entry: (p, n, part, s, children) =>
 			`人员 ${p}，论文 ${n}：${part}，${children[0]} 分得 ${s[0]}，${children[1]} 分得 ${s[1]}`,
-		idle: (n) =>
-			`10 篇中 ${n} 篇为 T1：Authors 取 1 时 Per author 为 ${n}，Authors 取 ${n / 10} 时为 ${n ? 10 : 0}`,
+		idle: (rows) =>
+			`两个人年：${rows.map(([place, part]) => `${place} ${part}`).join("，")}`,
 	},
 	composition: {
 		field: "学科",
@@ -100,19 +95,18 @@ export const zh: Words = {
 		axis: "占 T1 Count 的份额",
 		item: (name, year, share) => `${name}，${year}：占 T1 Count 的 ${share}`,
 	},
-	stability: {
-		axis: "与上一年的 Spearman 相关系数",
-		short: "与上一年的 Spearman ρ",
-		mean: (mean, from, to) => `：${from} 至 ${to} 年均值 ${mean}`,
-		year: (from, to, rho) => `，${from} 至 ${to}：${rho}`,
-	},
+
 	scaling: {
-		count: (view) => `Count，${view}`,
+		count: "Count",
 		authors: "Authors",
-		slope: "斜率",
-		fit: (n, slope) => `拟合 ${n} 个机构，斜率 ${slope}`,
-		short: (slope) => `拟合，斜率 ${slope}`,
-		point: (c, f, r) => `：Count ${c}，Authors ${f}，Per author ${r}`,
-		row: (slope, r2, n) => `：斜率 ${slope}，R² ${r2}，${n} 个机构`,
+		beta: "β",
+		expected: (beta) => `Expected，β = ${beta}`,
+		mean: "每组平均 Count，含 Count 为零的机构",
+		zeros: "Count 为零的比例",
+		point: (c, a, e, x) =>
+			`：Count ${c}，Authors ${a}，Expected ${e}，Excess ${x}`,
+		bin: (lo, hi, n, z, m) =>
+			`Authors ${lo} 至 ${hi}：${n} 个机构，其中 ${z} 个 Count 为零，平均 Count ${m}`,
+		row: (beta, n) => `：β ${beta}，${n} 个机构`,
 	},
 };
