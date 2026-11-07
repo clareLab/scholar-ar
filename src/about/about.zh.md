@@ -2,7 +2,7 @@
 title: AllRankings 如何运作
 author: clareLab
 abstract: |
-  AllRankings 在科学的每个范围里，按研究机构在该范围最强 venue 上发表的论文为机构排名。本文跟随一篇真实论文，逐步说明它如何变成网站上的数字。论文按其所引作品的主要主题分到各个范围。每个范围按 Open Scholar Ranking 分数为 venue 排序，这一分数来自 venue 之间的引用流。T1 由最强的那些 venue 组成，它们合计发表该范围约二十七分之一的论文。Count 累加机构在所选档和年份内论文上的分数署名，Authors 估计机构平均每年有多少人在该范围发表论文。表格按 Excess 为机构排名，Excess 等于机构的 Count 减去按其规模预期的 Count，预期值来自对整个范围拟合的 Authors 幂律。在检验的全部 {{validity.falls.views|int}} 个范围中，高一档的论文更常进入被引前 10% 和前 1%，平均学科加权引用影响也更高，这是分档具有实际意义的主要证据。
+  AllRankings 在科学的每个范围里，按研究机构在该范围最强 venue 上发表的论文为机构排名。本文跟随一篇真实论文，逐步说明它如何变成网站上的数字。论文按其所引作品的主要主题分到各个范围。每个范围按 Open Scholar Ranking 分数为 venue 排序，这一分数来自 venue 之间的引用流。T1 由最强的那些 venue 组成，它们合计发表该范围约二十七分之一的论文。Count 累加机构在所选档和年份内论文上的分数署名，Authors 估计机构平均每年有多少人在该范围发表论文。表格按 Excess 为机构排名，Excess 等于机构的 Count 减去按其规模预期的 Count，预期值来自对整个范围拟合的 Authors 幂律。在检验的全部 {{validity.falls.views|int}} 个范围中，高一档的论文平均学科加权引用影响更高，也更常进入被引前 1%。在其中 {{validity.falls.top10|int}} 个范围中，高一档的论文也更常进入被引前 10%。这是分档具有实际意义的主要证据。
 ---
 
 # 引言
@@ -49,20 +49,26 @@ $$
 
 # venue 分数
 
-venue 分数来自 Open Scholar Ranking（OSR）[@r8]，网址是 <https://osr.clarelab.moe>。OSR 沿用 Stigler [@r10] 以及 Varin 等人 [@r11] 的思路，对 venue 之间的引用流拟合 Bradley-Terry 模型 [@r9]。分数随年份做随机游走，与动态 Bradley-Terry 模型 [@r12] 相同。引用在施引作品的发表年份，从施引作品的来源流向被引作品的来源。设 $m_{ij,t}$ 为第 $t$ 年 venue $i$ 对 venue $j$ 的引用数，$E_{i,t}$ 为 $i$ 的暴露度，即 $i$ 当年平均每篇合格作品发出的引用数。给定两者之间的引用总数，模型为
+venue 分数来自 Open Scholar Ranking（OSR）[@r8]，网址是 <https://osr.clarelab.moe>。OSR 沿用 Stigler [@r10] 以及 Varin 等人 [@r11] 的思路，对 venue 之间的引用流拟合 Bradley-Terry 模型 [@r9]。分数随年份做随机游走，与动态 Bradley-Terry 模型 [@r12] 相同。引用在施引作品的发表年份，从施引作品的来源流向被引作品的来源。设 $m_{ij,t}$ 为第 $t$ 年 venue $i$ 对 venue $j$ 的引用数，$R_{i,t}$ 为 $i$ 当年对其他 venue 发出的全部引用，$B_{i,t}$ 为 $i$ 的可被引存量，定义见下文。给定两者之间的引用总数，模型为
 
 $$
 m_{ij,t} \sim \operatorname{Binomial}\!\left(m_{ij,t} + m_{ji,t},\; \pi_{ij,t}\right),
-\qquad \pi_{ij,t} = \sigma\!\left(\log \frac{E_{i,t}}{E_{j,t}} + \varphi_{j,t} - \varphi_{i,t}\right),
+\qquad \pi_{ij,t} = \sigma\!\left(\log \frac{R_{i,t}\, B_{j,t}}{R_{j,t}\, B_{i,t}} + \varphi_{j,t} - \varphi_{i,t}\right),
 $$
 
-其中 $\sigma(x) = 1/(1 + e^{-x})$ 是 logistic 函数，$\varphi_{i,t} - \varphi_{i,t-1}$ 服从均值为零的正态分布。考虑双方各自的引用量之后，$\varphi$ 较高的 venue 在与其他 venue 的引用往来中得到更多引用。第 $t$ 年的分数来自对 2004 年至第 $t$ 年数据的拟合。公布的分数为
+其中 $\sigma(x) = 1/(1 + e^{-x})$ 是 logistic 函数，$\varphi_{i,t} - \varphi_{i,t-1}$ 服从均值为零的正态分布。考虑双方各自的引用量和可被引存量之后，$\varphi$ 较高的 venue 在与其他 venue 的引用往来中得到更多引用。第 $t$ 年的分数来自对 2004 年至第 $t$ 年数据的拟合。被引的一方提供的是全部往期作品，所以可被引存量计入此前每一年的作品，并按该年龄作品的被引频率加权，定义为
+
+$$
+B_{v,t} = \sum_{t' \le t} Q_{v,t'}\, g(t - t'),
+$$
+
+其中 $Q_{v,t'}$ 是 venue $v$ 在第 $t'$ 年发表的合格作品数，$g(k)$ 是一篇作品在发表 $k$ 年后平均得到的引用数。它把 2004 年至 2025 年每个施引年份对 $k$ 年前作品的引用加总，再除以这些年份各自 $k$ 年前发表的合格作品数。公布的分数为
 
 $$
 S_{v,t} = \sigma\!\left(\varphi_{v,t} - \tilde\varphi_t\right),
 $$
 
-其中 $\tilde\varphi_t$ 是 OSR 在第 $t$ 年排名的各 venue 的 $\varphi$ 中位数，$S_{v,t}$ 因此是暴露度相同时，$v$ 与中位 venue 之间的一次引用流向 $v$ 的概率。
+其中 $\tilde\varphi_t$ 是 OSR 在第 $t$ 年排名的各 venue 的 $\varphi$ 中位数，$S_{v,t}$ 因此是考虑引用量和存量之后，$v$ 与中位 venue 之间的一次引用流向 $v$ 的概率。
 
 AllRankings 按 $\varphi$ 为 venue 排序，显示 $S$。它使用 OSR 打分的每个 venue 年份，其中包括引用核心里排在当年公开排名之外的 venue。展开 Venues 表的一行，可以看到这个 venue 每年的分数，与 OSR 一样保留四位小数。
 
@@ -217,7 +223,7 @@ Venues 表列出 Count 为正的每个 venue，并给出它在每个所选年份
 
 覆盖率是三个值齐全的论文所占的加权份额，窗口止于 {{validity.window.1|raw}} 年，让论文有时间积累引用。
 
-在 {{names.fields.17|raw}} 中，被引前 10% 份额在 T1 是 {{validity.rows[view=field/17,tier=1].top10|pct1}}，在 T4 是 {{validity.rows[view=field/17,tier=4].top10|pct1}}。平均 FWCI 由 T1 的 {{validity.rows[view=field/17,tier=1].fwci|d2}} 降到 T4 的 {{validity.rows[view=field/17,tier=4].fwci|d2}}，T1 的覆盖率是 {{validity.rows[view=field/17,tier=1].coverage|pct0}}。在 All 和各学科这全部 {{validity.falls.views|int}} 个视图中，三个比率都自 T1 至 T4 逐档下降，@fig:validity 给出全部视图。
+在 {{names.fields.17|raw}} 中，被引前 10% 份额在 T1 是 {{validity.rows[view=field/17,tier=1].top10|pct1}}，在 T4 是 {{validity.rows[view=field/17,tier=4].top10|pct1}}。平均 FWCI 由 T1 的 {{validity.rows[view=field/17,tier=1].fwci|d2}} 降到 T4 的 {{validity.rows[view=field/17,tier=4].fwci|d2}}，T1 的覆盖率是 {{validity.rows[view=field/17,tier=1].coverage|pct0}}。在 All 和各学科这全部 {{validity.falls.views|int}} 个视图中，被引前 1% 份额和平均 FWCI 都自 T1 至 T4 逐档下降。被引前 10% 份额在其中 {{validity.falls.top10|int}} 个视图中逐档下降，在 {{names.fields.18|raw}} 中 T2 和 T3 基本持平，分别为 {{validity.rows[view=field/18,tier=2].top10|pct1}} 和 {{validity.rows[view=field/18,tier=3].top10|pct1}}。@fig:validity 给出全部视图。
 
 ::: {#fig:validity .figure .wide}
 各档的引用影响，All 占一行，每个学科占一行，三列分别是被引前 10% 份额、被引前 1% 份额和平均 FWCI。每个点是一档，按 T1 至 T4 着色，越靠右影响越高。

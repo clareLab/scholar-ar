@@ -2,7 +2,7 @@
 title: How AllRankings works
 author: clareLab
 abstract: |
-  AllRankings ranks research institutions in every area of science by their papers in the strongest venues of that area. This text follows one real paper through each step that turns it into the numbers on the site. The paper is split among areas by the primary topics of the works it cites. Each area orders its venues by their Open Scholar Ranking score, a measure built on citation flows between venues, and T1 holds the strongest venues, which together publish about a twenty-seventh of the area's papers. Count adds up an institution's fractional credit for the papers in the selected tiers and years, and Authors estimates how many of its people publish in the area in an average year. The table ranks institutions by Excess, their Count minus the Count expected at their size from a power law in Authors fitted to the whole area. Papers in a higher tier are more often among the most cited 10% and 1% and have a higher mean field-weighted citation impact in all {{validity.falls.views|int}} areas tested, which is the main evidence that the tiers carry meaning.
+  AllRankings ranks research institutions in every area of science by their papers in the strongest venues of that area. This text follows one real paper through each step that turns it into the numbers on the site. The paper is split among areas by the primary topics of the works it cites. Each area orders its venues by their Open Scholar Ranking score, a measure built on citation flows between venues, and T1 holds the strongest venues, which together publish about a twenty-seventh of the area's papers. Count adds up an institution's fractional credit for the papers in the selected tiers and years, and Authors estimates how many of its people publish in the area in an average year. The table ranks institutions by Excess, their Count minus the Count expected at their size from a power law in Authors fitted to the whole area. In all {{validity.falls.views|int}} areas tested, papers in a higher tier have a higher mean field-weighted citation impact and are more often among the most cited 1%. They are more often among the most cited 10% in {{validity.falls.top10|int}} of the {{validity.falls.views|int}} areas. This is the main evidence that the tiers carry meaning.
 ---
 
 # Introduction
@@ -49,20 +49,26 @@ The example paper split by its references. Each reference with a primary topic i
 
 # Venue scores
 
-Venue scores come from Open Scholar Ranking (OSR) [@r8], at <https://osr.clarelab.moe>. OSR fits a Bradley-Terry model [@r9] to citation flows between venues, in the line of Stigler [@r10] and Varin and colleagues [@r11], with a random walk over years as in dynamic Bradley-Terry models [@r12]. A citation flows from the citing work's source to the cited work's source in the citing work's publication year. Let $m_{ij,t}$ be the citations from venue $i$ to venue $j$ in year $t$ and $E_{i,t}$ the exposure of $i$, the citations its works made per eligible work in that year. Given the pair total, the model is
+Venue scores come from Open Scholar Ranking (OSR) [@r8], at <https://osr.clarelab.moe>. OSR fits a Bradley-Terry model [@r9] to citation flows between venues, in the line of Stigler [@r10] and Varin and colleagues [@r11], with a random walk over years as in dynamic Bradley-Terry models [@r12]. A citation flows from the citing work's source to the cited work's source in the citing work's publication year. Let $m_{ij,t}$ be the citations from venue $i$ to venue $j$ in year $t$, $R_{i,t}$ all citations venue $i$ makes to other venues in year $t$, and $B_{i,t}$ its citable stock, defined below. Given the pair total, the model is
 
 $$
 m_{ij,t} \sim \operatorname{Binomial}\!\left(m_{ij,t} + m_{ji,t},\; \pi_{ij,t}\right),
-\qquad \pi_{ij,t} = \sigma\!\left(\log \frac{E_{i,t}}{E_{j,t}} + \varphi_{j,t} - \varphi_{i,t}\right),
+\qquad \pi_{ij,t} = \sigma\!\left(\log \frac{R_{i,t}\, B_{j,t}}{R_{j,t}\, B_{i,t}} + \varphi_{j,t} - \varphi_{i,t}\right),
 $$
 
-where $\sigma(x) = 1/(1 + e^{-x})$ is the logistic function and $\varphi_{i,t} - \varphi_{i,t-1}$ is normal with mean zero. A venue with higher $\varphi$ draws more of the citations it exchanges with other venues, after allowing for how much each side cites, and the scores for year $t$ come from a fit on the years from 2004 to $t$. The published score is
+where $\sigma(x) = 1/(1 + e^{-x})$ is the logistic function and $\varphi_{i,t} - \varphi_{i,t-1}$ is normal with mean zero. A venue with higher $\varphi$ draws more of the citations it exchanges with other venues, after allowing for how much each side cites and how much it offers to be cited, and the scores for year $t$ come from a fit on the years from 2004 to $t$. A cited venue offers its whole back catalogue, so the citable stock counts the works of every earlier year, each weighted by how often works of that age are cited:
+
+$$
+B_{v,t} = \sum_{t' \le t} Q_{v,t'}\, g(t - t'),
+$$
+
+where $Q_{v,t'}$ is the number of eligible works venue $v$ published in year $t'$ and $g(k)$ is the mean number of citations a work receives at age $k$. It sums, over the citing years from 2004 to 2025, the citations to works published $k$ years earlier, and divides by the eligible works published $k$ years before each of those years. The published score is
 
 $$
 S_{v,t} = \sigma\!\left(\varphi_{v,t} - \tilde\varphi_t\right),
 $$
 
-where $\tilde\varphi_t$ is the median $\varphi$ of the venues OSR ranks in year $t$, so $S_{v,t}$ is the chance that a citation between $v$ and a median venue, at equal exposure, goes to $v$.
+where $\tilde\varphi_t$ is the median $\varphi$ of the venues OSR ranks in year $t$, so $S_{v,t}$ is the chance that a citation between $v$ and a median venue goes to $v$ once citing volume and stock are allowed for.
 
 AllRankings orders venues by $\varphi$ and shows $S$. It uses every venue-year that OSR scores, which includes the venues of its citation core beyond each year's published ranking. An expanded row of the Venues table shows the venue's score per year to four decimals, as OSR does.
 
@@ -217,7 +223,7 @@ The tiers come from citation flows between venues, and this test measures the ci
 
 Coverage is the weighted share of papers with all three values, and the window ends in {{validity.window.1|raw}} so that the papers have had time to collect citations.
 
-In {{names.fields.17|raw}} the top 10% share is {{validity.rows[view=field/17,tier=1].top10|pct1}} in T1 and {{validity.rows[view=field/17,tier=4].top10|pct1}} in T4. Mean FWCI drops from {{validity.rows[view=field/17,tier=1].fwci|d2}} in T1 to {{validity.rows[view=field/17,tier=4].fwci|d2}} in T4, with a coverage of {{validity.rows[view=field/17,tier=1].coverage|pct0}} in T1. All three rates fall at every step from T1 to T4 in all {{validity.falls.views|int}} views, All and each field, and @fig:validity shows every one of them.
+In {{names.fields.17|raw}} the top 10% share is {{validity.rows[view=field/17,tier=1].top10|pct1}} in T1 and {{validity.rows[view=field/17,tier=4].top10|pct1}} in T4. Mean FWCI drops from {{validity.rows[view=field/17,tier=1].fwci|d2}} in T1 to {{validity.rows[view=field/17,tier=4].fwci|d2}} in T4, with a coverage of {{validity.rows[view=field/17,tier=1].coverage|pct0}} in T1. The top 1% share and the mean FWCI fall at every step from T1 to T4 in all {{validity.falls.views|int}} views, All and each field. The top 10% share does so in {{validity.falls.top10|int}} of them, and in {{names.fields.18|raw}} its values for T2 and T3 are level, at {{validity.rows[view=field/18,tier=2].top10|pct1}} and {{validity.rows[view=field/18,tier=3].top10|pct1}}. @fig:validity shows every one of them.
 
 ::: {#fig:validity .figure .wide}
 Citation impact by tier, one row for All and one per field, with one panel each for the top 10% share, the top 1% share and the mean FWCI. Each dot is one tier, coloured from T1 to T4, and dots further right mean higher impact.
