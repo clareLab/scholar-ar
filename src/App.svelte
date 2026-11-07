@@ -447,9 +447,7 @@
 				if (picked(t[r], v[r])) row.n += mass[r];
 			}
 		}
-		const listed = [...rows.values()].filter(
-			(row) => row.n > 0 && land(venues.country[row.v]),
-		);
+		const listed = [...rows.values()].filter((row) => row.n > 0);
 		const floor = above.has("venues")
 			? mean(listed, (row) => row.n)
 			: Number.NEGATIVE_INFINITY;
