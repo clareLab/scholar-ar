@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { tick } from "svelte";
+	import { tick, untrack } from "svelte";
 	import {
 		count,
 		credit,
@@ -634,16 +634,62 @@
 			s.venue = s.venue === id ? undefined : id;
 		});
 
-	let arrive =
-		first.tab === "institutions"
-			? first.inst !== undefined
-			: first.tab === "venues" && first.venue !== undefined;
+	type Move = "arrive" | "scope" | "sift";
+
+	let follow = $state<Move | undefined>(
+		(
+			first.tab === "institutions"
+				? first.inst !== undefined
+				: first.tab === "venues" && first.venue !== undefined
+		)
+			? "arrive"
+			: undefined,
+	);
 
 	let landing = $state(false);
 
+	const sift = $derived(
+		JSON.stringify([
+			s.from,
+			s.to,
+			s.tiers,
+			s.flip,
+			s.off,
+			s.at,
+			s.above,
+			s.sort,
+		]),
+	);
+
+	let scope: number | undefined;
+	let sifted: string | undefined;
+
 	$effect(() => {
-		if (!arrive || !ready) return;
-		arrive = false;
+		const view = s.view;
+		const now = sift;
+		const move: Move | undefined =
+			scope === undefined
+				? undefined
+				: view !== scope
+					? "scope"
+					: now !== sifted
+						? "sift"
+						: undefined;
+		[scope, sifted] = [view, now];
+		if (!move) return;
+		untrack(() => {
+			backs.institutions = undefined;
+			backs.venues = undefined;
+			const held = s.tab === "institutions" ? s.inst : s.venue;
+			if (held !== undefined) follow = move;
+			else if (move === "scope") scrollTo(0, 0);
+		});
+	});
+
+	$effect(() => {
+		if (!follow || !ready) return;
+		const move = follow;
+		follow = undefined;
 		const k =
 			s.tab === "institutions"
 				? table.findIndex((row) => row.i === open)
@@ -651,6 +697,7 @@
 		if (k < 0) {
 			if (s.tab === "institutions") s.inst = undefined;
 			else s.venue = undefined;
+			if (move === "scope") scrollTo(0, 0);
 			return;
 		}
 		shown = Math.max(shown, k + 200);
