@@ -4,6 +4,14 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
     <title>AllRankings</title>
+    <script>
+      if (
+        /[?&](from|to|tiers|flip|off|in|above|sort|by|inst|author|venue)=/.test(
+          location.search,
+        )
+      )
+        document.documentElement.classList.add("sift");
+    </script>
   </head>
   <body>
     <script type="module" src="/src/main.ts"></script>

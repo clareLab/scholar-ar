@@ -15,6 +15,7 @@
 		name: string;
 		root: Twig;
 		scope?: Twig;
+		href?: (twig: Twig) => string;
 		mark: (twig: Twig) => number;
 		flip: (twig: Twig, listed: boolean) => void;
 	};
@@ -51,6 +52,7 @@
 
 <script lang="ts">
 	import type { Snippet } from "svelte";
+	import { plain } from "./page";
 	import { fuzzy } from "./search";
 
 	let { trees, tail }: { trees: Tree[]; tail: Snippet } = $props();
@@ -120,7 +122,7 @@
 		void list;
 		void query;
 		void at;
-		return 200;
+		return 64;
 	});
 
 	let scroller = $state<HTMLElement>();
@@ -173,15 +175,24 @@
 		checked={value === 2}
 		{@attach (box) => mixed(box, value === 1)}
 		onchange={(event) => flip(event.currentTarget, value, twig, listed)}
-	/><button
-		class:miss={listed && value === 0}
-		class:flagged={twig.code !== undefined}
-		aria-current={twig === ink && !listed ? "true" : undefined}
-		onclick={() => open(twig)}
-		>{#if twig.code !== undefined}{@render badge(
-				twig.code,
-			)}{/if}{twig.name}</button
-	>
+	/>{#if tree.href}<a
+			class:miss={listed && value === 0}
+			href={tree.href(twig)}
+			aria-current={twig === ink && !listed ? "true" : undefined}
+			onclick={(event) => {
+				if (!plain(event)) return;
+				event.preventDefault();
+				open(twig);
+			}}>{twig.name}</a
+		>{:else}<button
+			class:miss={listed && value === 0}
+			class:flagged={twig.code !== undefined}
+			aria-current={twig === ink && !listed ? "true" : undefined}
+			onclick={() => open(twig)}
+			>{#if twig.code !== undefined}{@render badge(
+					twig.code,
+				)}{/if}{twig.name}</button
+		>{/if}
 {/snippet}
 
 <nav class={["panel", { shut }]}>
@@ -213,7 +224,7 @@
 			</li>
 		{/each}
 		{#if shown < items.length}
-			<li {@attach more(() => (shown += 200), scroller)}></li>
+			<li {@attach more(() => (shown *= 2), scroller)}></li>
 		{/if}
 	</ul>
 </nav>

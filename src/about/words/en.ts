@@ -6,7 +6,7 @@ export const en = {
 	name: "English",
 	flag: "GB",
 	cjk: false,
-	pdf: "allrankings.pdf",
+	pdf: "allrankings.en.pdf",
 	figure: "Figure",
 	abstract: "Abstract",
 	references: "References",

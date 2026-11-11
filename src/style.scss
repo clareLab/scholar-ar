@@ -77,7 +77,10 @@ a:hover,
 button.row:hover > .name,
 button.row:hover > .entry > .name,
 .open > .name,
-.open > .entry > .name {
+.open > .entry > .name,
+.lit > .name,
+.lit > .entry > .name,
+.row:has(> .hit:hover) > .name {
   text-decoration: underline 1px;
   text-underline-offset: 0.25em;
 }
@@ -127,6 +130,8 @@ h1 {
 }
 
 .bar button,
+.side > a,
+.tabs > a,
 .icons a,
 .lists button {
   color: var(--mute);
@@ -135,6 +140,11 @@ h1 {
   &.on {
     color: var(--ink);
   }
+}
+
+.side > a:not(.on):hover,
+.tabs > a:not(.on):hover {
+  text-decoration: none;
 }
 
 .tabs,
@@ -213,9 +223,18 @@ h1 {
     padding-left: 1.4em;
     text-indent: -1.4em;
 
-    > button {
+    > button,
+    > a {
       text-indent: 0;
       vertical-align: top;
+    }
+
+    > a {
+      display: inline-block;
+
+      &:hover {
+        text-decoration: none;
+      }
     }
   }
 
@@ -268,6 +287,16 @@ h1 {
   &:not(img) {
     box-shadow: none;
   }
+}
+
+.out > svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.sift main {
+  visibility: hidden;
 }
 
 main {
@@ -410,22 +439,29 @@ main {
   background: #fff;
 }
 
-.part > .entry > .name {
-  flex-basis: auto;
-}
-
-.score {
-  white-space: nowrap;
-}
-
 .sub {
+  position: relative;
+  z-index: 0;
+
   a {
+    position: relative;
+    z-index: 1;
     color: var(--link);
   }
 
   .num {
     color: var(--mute);
   }
+}
+
+.row > button.hit {
+  position: absolute;
+  inset: 0;
+  grid-area: auto;
+}
+
+.deep .name {
+  margin-left: var(--flag);
 }
 
 .strip {

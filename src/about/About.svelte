@@ -1,10 +1,21 @@
+<script lang="ts" module>
+	import en from "./about.md";
+	import zh from "./about.zh.md";
+	import type { Block, Paper } from "./render";
+	import type { About } from "./resolve";
+	import { type Lang, langs, words } from "./words";
+
+	export const built = { en, zh } as Record<
+		Lang,
+		{ paper: Paper; about: About }
+	>;
+</script>
+
 <script lang="ts">
 	import "katex/dist/katex.min.css";
 	import "./about.scss";
 	import { type Component, tick } from "svelte";
 	import { flag } from "../flags";
-	import en from "./about.md";
-	import zh from "./about.zh.md";
 	import apportion from "./figures/apportion.svelte";
 	import composition from "./figures/composition.svelte";
 	import concentration from "./figures/concentration.svelte";
@@ -15,9 +26,6 @@
 	import tiers from "./figures/tiers.svelte";
 	import validity from "./figures/validity.svelte";
 	import type { Props } from "./plot";
-	import type { Block, Paper } from "./render";
-	import type { About } from "./resolve";
-	import { type Lang, langs, words } from "./words";
 
 	let { lang = $bindable("en") }: { lang?: Lang } = $props();
 
@@ -33,7 +41,6 @@
 		scaling,
 	};
 
-	const built = { en, zh } as Record<Lang, { paper: Paper; about: About }>;
 	const { paper, about } = $derived(built[lang]);
 	const say = $derived(words[lang]);
 
@@ -119,7 +126,7 @@
 		};
 		const still = () => {
 			clearTimeout(idle);
-			idle = window.setTimeout(settle, rest === "scroll" ? 150 : 0);
+			idle = window.setTimeout(settle, rest === "scroll" ? 128 : 0);
 		};
 		last = scrollY;
 		spy();

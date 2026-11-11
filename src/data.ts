@@ -44,7 +44,7 @@ export type Meta = {
 
 export type Group = Record<string, number[] & number[][]>;
 
-const api = import.meta.env.VITE_API as string;
+export const api = import.meta.env.VITE_API as string;
 
 export const years = [2004, 2025];
 
@@ -216,6 +216,7 @@ export const credit = (
 	counted: (row: number, group: Group) => boolean,
 	sums: Float64Array,
 	sign = 1,
+	by?: (group: Group, row: number, id: number) => number,
 ) => {
 	for (const group of files) {
 		const { K, topics, k, w } = group;
@@ -223,8 +224,11 @@ export const credit = (
 		for (let r = 0; r < K.length; r++) {
 			if (!counted(r, group)) continue;
 			for (const [, kc] of split(topics[r], k[r], under)) {
-				for (let j = 0; j < ids[r].length; j++)
-					sums[ids[r][j]] += sign * Math.round((kc * w[r][j]) / (K[r] * 1000));
+				for (let j = 0; j < ids[r].length; j++) {
+					const at = by ? by(group, r, ids[r][j]) : ids[r][j];
+					if (at >= 0)
+						sums[at] += sign * Math.round((kc * w[r][j]) / (K[r] * 1000));
+				}
 			}
 		}
 	}
@@ -258,15 +262,20 @@ export const ends = (
 	);
 };
 
-export const stalls = (node: Node, years: number[], all: boolean) =>
+export const stalls = (
+	node: Node,
+	years: number[],
+	all: boolean,
+	names = node.children.length && !all
+		? ["year", "child", "v", "tier", "mass"]
+		: ["year", "v", "tier", "mass"],
+) =>
 	groups(
 		`views/${node.level}/${node.id}/venues.parquet`,
 		(stat) =>
 			having({ year: years })(stat) &&
 			(!node.children.length || (stat("child")[0] === 0) === all),
-		node.children.length && !all
-			? ["year", "child", "v", "tier", "mass"]
-			: ["year", "v", "tier", "mass"],
+		names,
 	);
 
 export const tally = (
@@ -312,6 +321,9 @@ export const shelve = (cells: Group[], ids: number[]) => {
 
 export type Shelf = ReturnType<typeof shelve>;
 
+export const bundle = (v: number, years: number[]) =>
+	groups(`venue/${v}.parquet`, having({ year: years }));
+
 export const swaps = (
 	shelf: Shelf,
 	flip: string[],
@@ -326,11 +338,9 @@ export const swaps = (
 				key: `${v} ${t}`,
 				sign: chosen.has(t) ? -1 : 1,
 				read: () =>
-					groups(
-						`venue/${v}.parquet`,
-						having({
-							year: span.filter((year) => shelf.tier.get(slot(v, year)) === t),
-						}),
+					bundle(
+						v,
+						span.filter((year) => shelf.tier.get(slot(v, year)) === t),
 					),
 			};
 		});
@@ -383,9 +393,9 @@ export const expect = (counts: Float64Array, people: Float64Array) => {
 		});
 		return at / sum;
 	};
-	let lo = -10;
-	let hi = 10;
-	for (let k = 0; k < 50; k++) {
+	let lo = -16;
+	let hi = 16;
+	for (let k = 0; k < 64; k++) {
 		const mid = (lo + hi) / 2;
 		if (mean(mid) < weighted / total) lo = mid;
 		else hi = mid;

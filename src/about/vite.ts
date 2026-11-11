@@ -4,6 +4,7 @@ import { fileURLToPath } from "node:url";
 import type { Plugin } from "vite";
 import { paper } from "./render.ts";
 import { resolve } from "./resolve.ts";
+import { sentence } from "./sentence.ts";
 import { type Lang, words } from "./words/index.ts";
 
 const data = "\0about-data";
@@ -23,7 +24,7 @@ export const about = (): Plugin => {
 			return `export default ${JSON.stringify(await read())}`;
 		},
 		async transform(text, id) {
-			const match = id.match(/\/about\/about(?:\.(\w+))?\.md$/);
+			const match = id.match(/\/about\/about(?:\.(\w+))?\.md(\?lead)?$/);
 			const lang = (match?.[1] ?? "en") as Lang;
 			if (!match || !(lang in words)) return;
 			this.addWatchFile(path);
@@ -33,6 +34,8 @@ export const about = (): Plugin => {
 				resolve(text, json, { year: new Date().getFullYear() }),
 				words[lang],
 			);
+			if (match[2])
+				return `export default ${JSON.stringify(sentence(built.abstract))}`;
 			return {
 				code: `import about from ${JSON.stringify(data)};\nexport default { paper: ${JSON.stringify(built)}, about };`,
 				map: null,
