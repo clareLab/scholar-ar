@@ -18,6 +18,16 @@
 		href?: (twig: Twig) => string;
 		mark: (twig: Twig) => number;
 		flip: (twig: Twig, listed: boolean) => void;
+		share: (twig: Twig, near: boolean) => number | undefined;
+		tag?: (twig: Twig) => string | undefined;
+	};
+
+	const percent = (share?: number) => {
+		if (share === undefined) return "";
+		const p = share * 100;
+		if (!p) return "0%";
+		if (p < 0.01) return "<0.01%";
+		return `${p < 9.95 ? p.toPrecision(2) : Math.round(p)}%`;
 	};
 
 	export const whole = (marks: number[]) =>
@@ -155,6 +165,45 @@
 	const mixed = (box: HTMLInputElement, value: boolean) => {
 		box.indeterminate = value;
 	};
+
+	let seen = $state.raw(new Set<Twig>());
+	const rows = new Map<Element, Twig>();
+	const near = new Set<Element>();
+	let settle: ReturnType<typeof setTimeout> | undefined;
+	let watch: IntersectionObserver | undefined;
+
+	const rest = () => {
+		clearTimeout(settle);
+		settle = setTimeout(() => {
+			seen = new Set([...near].map((row) => rows.get(row) as Twig));
+		}, 256);
+	};
+
+	const sight = (twig: Twig) => (row: Element) => {
+		watch ??= new IntersectionObserver((entries) => {
+			for (const { target, isIntersecting } of entries)
+				if (isIntersecting) near.add(target);
+				else near.delete(target);
+			rest();
+		});
+		rows.set(row, twig);
+		watch.observe(row);
+		return () => {
+			watch?.unobserve(row);
+			rows.delete(row);
+			near.delete(row);
+		};
+	};
+
+	$effect(() => () => {
+		watch?.disconnect();
+		clearTimeout(settle);
+	});
+
+	const figure = (twig: Twig, listed: boolean) => {
+		const tag = listed && query.trim() ? tree.tag?.(twig) : undefined;
+		return tag ?? percent(tree.share(twig, seen.has(twig)));
+	};
 </script>
 
 {#snippet badge(code: string)}
@@ -168,31 +217,38 @@
 
 {#snippet item(twig: Twig, listed: boolean)}
 	{@const value = tree.mark(twig)}
-	<input
-		class="box"
-		type="checkbox"
-		aria-label={twig.name}
-		checked={value === 2}
-		{@attach (box) => mixed(box, value === 1)}
-		onchange={(event) => flip(event.currentTarget, value, twig, listed)}
-	/>{#if tree.href}<a
-			class:miss={listed && value === 0}
-			href={tree.href(twig)}
-			aria-current={twig === ink && !listed ? "true" : undefined}
-			onclick={(event) => {
-				if (!plain(event)) return;
-				event.preventDefault();
-				open(twig);
-			}}>{twig.name}</a
-		>{:else}<button
-			class:miss={listed && value === 0}
-			class:flagged={twig.code !== undefined}
-			aria-current={twig === ink && !listed ? "true" : undefined}
-			onclick={() => open(twig)}
-			>{#if twig.code !== undefined}{@render badge(
-					twig.code,
-				)}{/if}{twig.name}</button
-		>{/if}
+	<span class="label"
+		><input
+			class="box"
+			type="checkbox"
+			aria-label={twig.name}
+			checked={value === 2}
+			{@attach (box) => mixed(box, value === 1)}
+			onchange={(event) => flip(event.currentTarget, value, twig, listed)}
+		/>{#if tree.href}<a
+				class:miss={listed && value === 0}
+				href={tree.href(twig)}
+				aria-current={twig === ink && !listed ? "true" : undefined}
+				onclick={(event) => {
+					if (!plain(event)) return;
+					event.preventDefault();
+					open(twig);
+				}}>{twig.name}</a
+			>{:else}<button
+				class:miss={listed && value === 0}
+				class:flagged={twig.code !== undefined}
+				aria-current={twig === ink && !listed ? "true" : undefined}
+				onclick={() => open(twig)}
+				>{#if twig.code !== undefined}{@render badge(
+						twig.code,
+					)}{/if}{twig.name}</button
+			>{/if}
+		{#if listed && query.trim() && !tree.tag && twig.parent?.parent}
+			<span class="miss kin">{twig.parent.name}</span>
+		{/if}</span
+	><span class="share" class:miss={listed && value === 0}
+		>{figure(twig, listed)}</span
+	>
 {/snippet}
 
 <nav class={["panel", { shut }]}>
@@ -210,18 +266,15 @@
 	{#if path.length}
 		<ul class="path">
 			{#each path as twig (twig.id)}
-				<li class:up={twig !== ink}>{@render item(twig, false)}</li>
+				<li class:up={twig !== ink} {@attach sight(twig)}>
+					{@render item(twig, false)}
+				</li>
 			{/each}
 		</ul>
 	{/if}
 	<ul bind:this={scroller}>
 		{#each items.slice(0, shown) as twig, k (k)}
-			<li>
-				{@render item(twig, true)}
-				{#if query.trim() && twig.parent}
-					<span class="miss">{twig.parent.name}</span>
-				{/if}
-			</li>
+			<li {@attach sight(twig)}>{@render item(twig, true)}</li>
 		{/each}
 		{#if shown < items.length}
 			<li {@attach more(() => (shown *= 2), scroller)}></li>

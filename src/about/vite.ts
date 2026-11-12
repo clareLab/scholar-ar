@@ -8,6 +8,7 @@ import { sentence } from "./sentence.ts";
 import { type Lang, words } from "./words/index.ts";
 
 const data = "\0about-data";
+const snapshot = "virtual:snapshot";
 
 export const about = (): Plugin => {
 	const path = fileURLToPath(
@@ -17,11 +18,14 @@ export const about = (): Plugin => {
 		existsSync(path) ? JSON.parse(await readFile(path, "utf8")) : undefined;
 	return {
 		name: "about",
-		resolveId: (id) => (id === data ? id : undefined),
+		resolveId: (id) =>
+			id === data ? id : id === snapshot ? `\0${snapshot}` : undefined,
 		async load(id) {
-			if (id !== data) return;
+			if (id !== data && id !== `\0${snapshot}`) return;
 			this.addWatchFile(path);
-			return `export default ${JSON.stringify(await read())}`;
+			const json = await read();
+			if (id === data) return `export default ${JSON.stringify(json)}`;
+			return `export default ${JSON.stringify(json?.snapshot ?? "")}`;
 		},
 		async transform(text, id) {
 			const match = id.match(/\/about\/about(?:\.(\w+))?\.md(\?lead)?$/);

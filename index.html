@@ -11,6 +11,15 @@
         )
       )
         document.documentElement.classList.add("sift");
+      const gauge = document.createElement("div");
+      gauge.style.cssText =
+        "position: absolute; width: 64px; overflow-y: auto; scrollbar-gutter: stable; visibility: hidden";
+      document.documentElement.append(gauge);
+      document.documentElement.style.setProperty(
+        "--gutter",
+        `${gauge.offsetWidth - gauge.clientWidth}px`,
+      );
+      gauge.remove();
     </script>
   </head>
   <body>

@@ -14,6 +14,8 @@ $phone: 760px;
   --year: 0.8em;
   --flag: 1.4em;
   --venue: 12em;
+  --share: 3.3em;
+  --gutter: 0px;
 
   color-scheme: light;
 }
@@ -159,6 +161,21 @@ h1 {
   vertical-align: -0.15em;
 }
 
+.icons [aria-busy="true"] {
+  cursor: progress;
+  animation: pulse 1.2s ease-in-out infinite alternate;
+}
+
+.icons button[aria-disabled="true"] {
+  color: var(--mute);
+}
+
+@keyframes pulse {
+  to {
+    opacity: 0.25;
+  }
+}
+
 .home svg {
   width: 0.62em;
   height: 0.85em;
@@ -176,11 +193,13 @@ h1 {
   flex-direction: column;
   height: calc(100vh - var(--bar));
   margin-left: -3px;
+  padding-right: var(--gutter);
   padding-left: 3px;
   overflow: hidden;
   overscroll-behavior: contain;
 
   > input {
+    margin-right: calc(0px - var(--gutter));
     padding: 4px 0 5px;
     border-bottom: 1px solid var(--ink);
 
@@ -200,28 +219,43 @@ h1 {
 
   ul {
     flex: 1;
-    margin: 0;
-    padding: 0 1.5em 24px 0;
+    margin: 0 calc(0px - var(--gutter)) 0 0;
+    padding: 0 0 24px;
     overflow-y: auto;
     list-style: none;
     overscroll-behavior: contain;
+    scrollbar-gutter: stable;
   }
 
   .path {
     flex: none;
-    margin-bottom: 6px;
+    margin: 0 0 6px;
     padding-bottom: 5px;
     overflow: visible;
     border-bottom: 1px solid var(--hair);
   }
 
-  .up > :last-child {
+  .up .label > :last-child,
+  .up .share {
     color: var(--mute);
   }
 
   li {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) var(--share);
+    column-gap: 0.5em;
+    align-items: baseline;
+  }
+
+  .share {
+    text-align: right;
+    white-space: nowrap;
+  }
+
+  .label {
     padding-left: 1.4em;
     text-indent: -1.4em;
+    overflow-wrap: anywhere;
 
     > button,
     > a {
@@ -238,7 +272,13 @@ h1 {
     }
   }
 
-  .flagged {
+  .label > .kin {
+    display: inline-block;
+    text-indent: 0;
+    vertical-align: top;
+  }
+
+  .label > .flagged {
     padding-left: var(--flag);
     text-indent: calc(0px - var(--flag));
   }
@@ -516,13 +556,13 @@ main {
     position: static;
     height: auto;
     margin-left: 0;
-    padding: 6px 0 0;
+    padding: 6px var(--gutter) 0 0;
     overflow: visible;
     overscroll-behavior: auto;
 
     > input {
       order: 1;
-      margin-top: 6px;
+      margin: 6px 0 0;
     }
 
     ul {

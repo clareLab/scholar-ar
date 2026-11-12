@@ -68,6 +68,11 @@ export const forget = (view: string) => {
 			memo.delete(key);
 };
 
+export const drop = (view: string) => {
+	for (const key of memo.keys())
+		if (key.startsWith(`${view}/`)) memo.delete(key);
+};
+
 const json = <T>(path: string) =>
 	once(path, () =>
 		fetch(`${api}/${path}`).then((r) => (r.ok ? r.json() : undefined)),
@@ -384,13 +389,14 @@ export const expect = (counts: Float64Array, people: Float64Array) => {
 		return logs.map((l) => Math.exp(beta * l - shift));
 	};
 	const mean = (beta: number) => {
-		const w = weights(beta);
+		const shift = beta * (beta > 0 ? high : low);
 		let sum = 0;
 		let at = 0;
-		w.forEach((x, k) => {
+		for (const l of logs) {
+			const x = Math.exp(beta * l - shift);
 			sum += x;
-			at += x * logs[k];
-		});
+			at += x * l;
+		}
 		return at / sum;
 	};
 	let lo = -16;

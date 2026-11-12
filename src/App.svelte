@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { tick, untrack } from "svelte";
 	import {
+		api,
 		bundle,
 		count,
 		credit,
@@ -30,7 +31,7 @@
 	} from "./data";
 	import { continents } from "./continents";
 	import { type Lang, words } from "./about/words";
-	import { country } from "./flags";
+	import { country, flag } from "./flags";
 	import {
 		about as described,
 		apply,
@@ -242,14 +243,14 @@
 	const cells = $derived(
 		take(`${base}/venues ${range}`, () => stalls(node, years, true)),
 	);
+	const sliced = $derived(`${base}/venues ${range} split`);
+	const parted = () => take(sliced, () => stalls(node, years, false));
 	const wares = $derived(
 		!node.children.length || all
 			? cells
 			: node.children.every((child) => off.has(child.id))
 				? []
-				: take(`${base}/venues ${range} split`, () =>
-						stalls(node, years, false),
-					),
+				: parted(),
 	);
 	const marks = $derived(
 		s.tab !== "venues"
@@ -331,16 +332,21 @@
 		return rows;
 	};
 
+	const sums = $derived(
+		ready
+			? count(
+					counts ?? [[], []],
+					bundles.map(({ sign, files }) => ({ sign, files: files ?? [] })),
+					under,
+					off,
+					institutions.id.length,
+				)
+			: undefined,
+	);
+
 	const listed = $derived.by(() => {
-		if (!ready) return undefined;
+		if (!sums) return undefined;
 		const size = institutions.id.length;
-		const sums = count(
-			counts ?? [[], []],
-			bundles.map(({ sign, files }) => ({ sign, files: files ?? [] })),
-			under,
-			off,
-			size,
-		);
 		const people = tally(faculty ?? [[], []], size, "f", off);
 		const expected = expect(sums, people);
 		const rows: Row[] = [];
@@ -693,6 +699,92 @@
 				);
 			else rescope(twig.id as number, []);
 		},
+		share: (twig, near) => {
+			const parent = twig.parent as Node | undefined;
+			if (!parent) return undefined;
+			if (parent !== node) return portion(parent, twig.id as number, near);
+			if (!near && !got.has(sliced)) return undefined;
+			return own?.sum
+				? (own.parts.get(twig.id as number) ?? 0) / own.sum
+				: undefined;
+		},
+	});
+
+	type Portion = { parts: Map<number, number[]>; sum: number[] };
+
+	let portions = $state.raw(new Map<string, Portion>());
+	const asked = new Set<string>();
+
+	let worker: Worker | undefined;
+
+	const spawn = () => {
+		const next = new Worker(new URL("./portion.ts", import.meta.url), {
+			type: "module",
+		});
+		next.onmessage = ({ data: { key, parts, sum } }) => {
+			if (parts) portions = new Map(portions).set(key, { parts, sum });
+			else asked.delete(key);
+		};
+		return next;
+	};
+
+	const ask = (parent: Node, key: string, span: number[]) => {
+		if (ssr || asked.has(key)) return;
+		asked.add(key);
+		worker ??= spawn();
+		worker.postMessage({
+			key,
+			level: parent.level,
+			id: parent.id,
+			span: [...span],
+		});
+	};
+
+	const portion = (parent: Node, child: number, near: boolean) => {
+		const key = `${parent.id} ${range}`;
+		const hit = portions.get(key);
+		if (!hit) {
+			if (near) ask(parent, key, years);
+			return undefined;
+		}
+		let part = 0;
+		let sum = 0;
+		for (const t of s.tiers) {
+			part += hit.parts.get(child)?.[t] ?? 0;
+			sum += hit.sum[t];
+		}
+		return sum ? part / sum : undefined;
+	};
+
+	const own = $derived.by(() => {
+		const files = node.children.length ? parted() : undefined;
+		if (!files) return undefined;
+		const parts = new Map<number, number>();
+		let sum = 0;
+		for (const { child, v, tier: t, mass } of files)
+			for (let r = 0; r < v.length; r++) {
+				if (!picked(t[r], v[r])) continue;
+				parts.set(child[r], (parts.get(child[r]) ?? 0) + mass[r]);
+				sum += mass[r];
+			}
+		return { parts, sum };
+	});
+
+	let heaped = { by: new Map<number, number>(), sum: [0, 0, 0, 0, 0] };
+
+	const heaps = $derived.by(() => {
+		if (!wares) return heaped;
+		const by = new Map<number, number>();
+		const sum = [0, 0, 0, 0, 0];
+		for (const { child, v, tier: t, mass } of wares)
+			for (let r = 0; r < v.length; r++) {
+				if (child && off.has(child[r])) continue;
+				const key = v[r] * 8 + t[r];
+				by.set(key, (by.get(key) ?? 0) + mass[r]);
+				sum[t[r]] += mass[r];
+			}
+		heaped = { by, sum };
+		return heaped;
 	});
 
 	const shelves: Tree = $derived({
@@ -725,6 +817,34 @@
 				s.flip = [];
 			}
 		},
+		share: (twig) => {
+			if (!twig.parent) return undefined;
+			const { by, sum } = heaps;
+			if (typeof twig.id === "number") {
+				const total = sum.reduce((a, b) => a + b, 0);
+				return total ? sum[twig.id] / total : undefined;
+			}
+			const [t, v] = shelf.mass.get(twig.id) as number[];
+			return sum[t] ? (by.get(v * 8 + t) ?? 0) / sum[t] : undefined;
+		},
+		tag: (twig) => (twig.parent?.parent ? twig.parent.name : undefined),
+	});
+
+	let weighed = { by: new Map<string, number>(), sum: 0 };
+
+	const weights = $derived.by(() => {
+		if (!sums) return weighed;
+		const known = new Set(lands);
+		const by = new Map<string, number>();
+		let sum = 0;
+		sums.forEach((n, i) => {
+			const code = institutions.country[i];
+			if (n <= 0 || !known.has(code)) return;
+			by.set(code, (by.get(code) ?? 0) + n);
+			sum += n;
+		});
+		weighed = { by, sum };
+		return weighed;
 	});
 
 	const held = (twig: Twig) =>
@@ -757,6 +877,13 @@
 			const on = held(twig) !== 2;
 			const codes = new Set(leaves(twig).map((l) => l.id));
 			s.at = lands.filter((code) => (codes.has(code) ? on : at.has(code)));
+		},
+		share: (twig) => {
+			const { by, sum } = weights;
+			if (!twig.parent || !sum) return undefined;
+			let n = 0;
+			for (const leaf of leaves(twig)) n += by.get(leaf.id as string) ?? 0;
+			return n / sum;
 		},
 	});
 
@@ -1017,6 +1144,20 @@
 		anchor.click();
 		URL.revokeObjectURL(anchor.href);
 	};
+
+	let making = $state(false);
+
+	const poster = async () => {
+		if (making) return;
+		making = true;
+		try {
+			const { make } = await import("./poster/make");
+			await make(s, api, flag);
+		} catch (error) {
+			console.error(error);
+		}
+		making = false;
+	};
 </script>
 
 <svelte:window onpopstate={() => (s = read())} />
@@ -1034,14 +1175,9 @@
 	>
 {/snippet}
 
-{#snippet down()}
+{#snippet icon(d: string)}
 	<svg viewBox="0 0 16 16" aria-hidden="true"
-		><path
-			fill="none"
-			stroke="currentColor"
-			stroke-width="1.5"
-			d="M8 1.5v9M4 7l4 4 4-4M2 14.5h12"
-		/></svg
+		><path fill="none" stroke="currentColor" stroke-width="1.5" {d} /></svg
 	>
 {/snippet}
 
@@ -1144,14 +1280,28 @@
 					href="{import.meta.env.BASE_URL}{words[s.lang].pdf}"
 					download
 					title="Download PDF"
-					aria-label="Download PDF">{@render down()}</a
+					aria-label="Download PDF"
+					>{@render icon("M8 1.5v9M4 7l4 4 4-4M2 14.5h12")}</a
 				>
 			{:else}
+				<button
+					aria-disabled={making}
+					aria-busy={making}
+					title="Download poster"
+					aria-label="Download poster"
+					onclick={poster}
+					>{@render icon(
+						"M3.25 1.75h9.5v12.5h-9.5zM5.5 4.75h5M5.5 11.5l1.75-2 1.5 1.25 1.75-2.5",
+					)}</button
+				>
 				<button
 					disabled={!ready}
 					title="Download CSV"
 					aria-label="Download CSV"
-					onclick={csv}>{@render down()}</button
+					onclick={csv}
+					>{@render icon(
+						"M1.75 2.75h12.5v10.5H1.75zM1.75 6.25h12.5M1.75 9.75h12.5M6 2.75v10.5",
+					)}</button
 				>
 			{/if}
 			<a
