@@ -18,6 +18,8 @@ import {
 	whole,
 } from "../data";
 
+import { nation } from "./format";
+
 const depth = 8;
 const shortlist = 4;
 
@@ -39,6 +41,20 @@ export const lands = (meta: Meta) => {
 		.flatMap(([, codes]) => codes.split(" "))
 		.filter((code) => seen.has(code))
 		.sort();
+};
+
+const places = (meta: Meta, at: string[]) => {
+	const present = new Set(lands(meta));
+	const picked = new Set(at);
+	const named: string[] = [];
+	const covered = new Set<string>();
+	for (const [name, codes] of continents) {
+		const here = codes.split(" ").filter((code) => present.has(code));
+		if (!here.length || !here.every((code) => picked.has(code))) continue;
+		named.push(name);
+		for (const code of here) covered.add(code);
+	}
+	return [...named, ...at.filter((code) => !covered.has(code)).map(nation)];
 };
 
 const slug = (text: string) =>
@@ -421,7 +437,12 @@ export const poster = async (meta: Meta, s: Selection) => {
 	return {
 		view: { id: node.id, name: node.name, level: node.level, trail },
 		...address(meta, node, s),
-		selection: { ...s, years, at: every ? null : s.at },
+		selection: {
+			...s,
+			years,
+			at: every ? null : s.at,
+			places: every ? null : places(meta, s.at),
+		},
 		levels: {
 			child: node.children[0]?.level ?? null,
 			grandchild:

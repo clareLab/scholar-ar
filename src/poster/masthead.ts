@@ -1,5 +1,5 @@
 import { balance, cap, type Font, measure } from "./fonts";
-import { list, nation, plural, titled, whole } from "./format";
+import { list, plural, titled, whole } from "./format";
 import type { Data } from "./model";
 import { grey, ink, link } from "./palette";
 import { qr } from "./qr";
@@ -27,32 +27,56 @@ export const brand = "AllRankings";
 
 const level = (name: string) => name.charAt(0).toUpperCase() + name.slice(1);
 
+const series = (names: string[]) =>
+	names.map((name, k) =>
+		k === names.length - 1 && k
+			? `and ${name}`
+			: k < names.length - 2
+				? `${name},`
+				: name,
+	);
+
 export const selection = (data: Data) => {
-	const parts: string[] = [];
-	if (data.view.level !== "all") parts.push(level(data.view.level));
+	const parts: string[][] = [];
+	if (data.view.level !== "all") parts.push([level(data.view.level)]);
 	const [from, to] = [data.selection.from, data.selection.to];
-	parts.push(from === to ? `${from}` : `${from} to ${to}`);
-	parts.push(list(data.selection.tiers.map((t) => `T${t}`)));
+	parts.push([from === to ? `${from}` : `${from} to ${to}`]);
+	parts.push([list(data.selection.tiers.map((t) => `T${t}`))]);
 	const child = data.levels.child;
 	if (child) {
 		const checked = data.children.length + data.zero.length;
 		const noun = plural(data.levels.total, child, `${child}s`);
-		parts.push(
+		parts.push([
 			checked < data.levels.total
 				? `${whole(checked)} of ${noun}`
 				: `all ${noun}`,
-		);
+		]);
 	}
-	const at = data.selection.at;
-	parts.push(at ? list(at.map(nation)) : "all countries");
+	const places = data.selection.places;
+	parts.push(places ? series(places) : ["all countries"]);
 	const tiers = new Set(data.selection.tiers);
 	const flips = data.selection.flip.map((key) => Number(key.split(".")[0]));
 	const added = flips.filter((t) => !tiers.has(t)).length;
 	const removed = flips.length - added;
-	if (added) parts.push(plural(added, "listing added", "listings added"));
+	if (added) parts.push([plural(added, "listing added", "listings added")]);
 	if (removed)
-		parts.push(plural(removed, "listing removed", "listings removed"));
-	return parts.join(", ");
+		parts.push([plural(removed, "listing removed", "listings removed")]);
+	return parts.flatMap((part, k) =>
+		part.map((word, j) =>
+			j === part.length - 1 && k < parts.length - 1 ? `${word},` : word,
+		),
+	);
+};
+
+const fill = (words: string[], size: number, font: Font, room: number) => {
+	const lines: string[] = [];
+	for (const word of words) {
+		const last = lines[lines.length - 1];
+		if (last !== undefined && measure(`${last} ${word}`, size, font) <= room)
+			lines[lines.length - 1] = `${last} ${word}`;
+		else lines.push(word);
+	}
+	return lines;
 };
 
 export const totals = (data: Data) => {
@@ -144,7 +168,6 @@ export const masthead = (
 		if (done) break;
 	}
 	const path = top ? undefined : pathLine(data, room);
-	const lines = [selection(data), totals(data)];
 	const labelW = Math.max(
 		...meta.map((m) => measure(m.label, metaSize, medium)),
 	);
@@ -204,11 +227,33 @@ export const masthead = (
 				inner.text(x, b, data.url, urlSize, medium, link),
 			),
 	});
+	const pitch = Math.round(lineSize * 1.3);
+	const metaPitch = Math.round(metaSize * 1.35);
+	const textXOf = (n: number) => {
+		const side =
+			cap(lineSize, regular) + (n - 1) * pitch + 40 + meta.length * metaPitch;
+		return Math.ceil(
+			side + Math.max(64, Math.ceil((4 * side) / matrix.length)),
+		);
+	};
+	const bound = Math.max(room, widest);
+	const words = selection(data);
+	const wrapped = (n: number) => [
+		...fill(words, lineSize, regular, bound - textXOf(n)),
+		totals(data),
+	];
+	let lines = wrapped(2);
+	for (let k = 0; k < 8; k++) {
+		const next = wrapped(lines.length);
+		const settled = next.length === lines.length;
+		lines = next;
+		if (settled) break;
+	}
 	y += 40;
 	const rows: { y: number; draw: (s: Scene, x: number, b: number) => void }[] =
 		[];
 	for (const line of lines) {
-		y += Math.round(lineSize * 1.3);
+		y += pitch;
 		rows.push({
 			y,
 			draw: (s, x, b) => s.text(x, b, line, lineSize, regular, ink),
@@ -216,7 +261,7 @@ export const masthead = (
 	}
 	y += 40;
 	for (const m of meta) {
-		y += Math.round(metaSize * 1.35);
+		y += metaPitch;
 		rows.push({
 			y,
 			draw: (s, x, b) => {
