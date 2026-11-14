@@ -427,15 +427,13 @@ export const planLedger = (
 	cap_: number,
 	withCountries: boolean,
 	boost = true,
-	most = Number.POSITIVE_INFINITY,
 ) => {
-	const sizes = sizesL.filter((v) => v <= most);
 	const gridAt = (s: number) => {
 		const least = venueWidth(data, derived, s);
 		const n = Math.max(2, Math.floor((width + gutter) / (least + gutter)));
 		return gridOf(width, n, gutter);
 	};
-	const attempt = (s: number) => {
+	const attempt = (s: number, most = derived.venueCut.end) => {
 		const grid = gridAt(s);
 		const sheets: Sheet[] = [];
 		if (derived.children.length) {
@@ -447,7 +445,9 @@ export const planLedger = (
 			const nations = countriesBlock(data, derived, s, 0, true);
 			const first = Math.ceil((nations.width + grid.g) / (grid.w + grid.g));
 			const venues =
-				first < grid.n ? venuesBlock(data, derived, s, grid, first) : undefined;
+				first < grid.n
+					? venuesBlock(data, derived, s, grid, first, most)
+					: undefined;
 			if (!venues) return undefined;
 			sheets.push({
 				height: Math.max(nations.height, venues.height),
@@ -457,7 +457,7 @@ export const planLedger = (
 				},
 			});
 		} else {
-			const venues = venuesBlock(data, derived, s, grid);
+			const venues = venuesBlock(data, derived, s, grid, 0, most);
 			if (!venues) return undefined;
 			sheets.push(venues);
 		}
@@ -466,7 +466,7 @@ export const planLedger = (
 		return { grid, sheets, height };
 	};
 	const fit = (room: number) => {
-		for (const s of sizes) {
+		for (const s of sizesL) {
 			const got = attempt(s);
 			if (got && got.height <= room) return s;
 		}
@@ -480,16 +480,22 @@ export const planLedger = (
 	}
 	const size =
 		s ??
-		[...sizes].reverse().find((v) => attempt(v)) ??
-		sizes[sizes.length - 1];
-	const chosen = attempt(size);
+		[...sizesL].reverse().find((v) => attempt(v)) ??
+		sizesL[sizesL.length - 1];
+	let most = derived.venueCut.end;
+	if (s === undefined) {
+		const room = cap_ + (boost ? 768 : 0);
+		let lo = 0;
+		while (most - lo > 1) {
+			const mid = Math.floor((lo + most) / 2);
+			if ((attempt(size, mid)?.height ?? room + 1) <= room) lo = mid;
+			else most = mid;
+		}
+		most = lo;
+	}
+	const chosen = attempt(size, most);
 	if (!chosen) throw new Error("no ledger layout");
-	return {
-		s: size,
-		...chosen,
-		bands: chosen.sheets.map((b) => b.height),
-		bandGap,
-	};
+	return { ...chosen, bandGap };
 };
 
 export const drawLedger = (

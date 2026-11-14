@@ -4,7 +4,8 @@ import type { Meta } from "./data";
 import type { Head, Ssr } from "./page";
 
 export { api, forget, load } from "./data";
-export { origin, quote, tags } from "./page";
+export { quote, tags } from "./page";
+export { origin } from "./state";
 
 export const draw = async (meta: Meta, path: string, rows: number) => {
 	const ssr: Ssr = { path, rows, got: new Map(), wait: new Map() };

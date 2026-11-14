@@ -31,6 +31,9 @@ export const nation = (code: string) =>
 export const plural = (n: number, one: string, many: string) =>
 	`${whole(n)} ${n === 1 ? one : many}`;
 
+export const plurals = (word: string) =>
+	word.endsWith("y") ? `${word.slice(0, -1)}ies` : `${word}s`;
+
 export const list = (items: string[]) =>
 	new Intl.ListFormat("en-GB", { type: "conjunction" }).format(items);
 
@@ -61,7 +64,8 @@ export const snap = (size: number) => {
 	return out;
 };
 
-export const clean = (name: string) => name.replace(/&amp;?/g, "&");
+export const clean = (name: string) =>
+	name.replace(/&amp;?/g, "&").replace(/(?![\u200c\u200d])\p{Cf}/gu, "");
 
 export const venueName = (name: string) =>
 	clean(name).replace(/\b([A-Z][a-z]+) s (?=\S)/g, "$1's ");

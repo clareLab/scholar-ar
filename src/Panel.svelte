@@ -62,6 +62,7 @@
 
 <script lang="ts">
 	import type { Snippet } from "svelte";
+	import { MediaQuery } from "svelte/reactivity";
 	import { plain } from "./page";
 	import { fuzzy } from "./search";
 
@@ -69,6 +70,7 @@
 
 	let list = $state(0);
 	let shut = $state(true);
+	const narrow = new MediaQuery("(width < 760px)");
 	let query = $state("");
 	let spots = $state<
 		({ scope?: number | string; ids: (number | string)[] } | undefined)[]
@@ -257,7 +259,7 @@
 		{#each trees as { name }, k (name)}
 			<button
 				class:on={list === k}
-				aria-expanded={list === k && !shut}
+				aria-expanded={narrow.current ? list === k && !shut : undefined}
 				onclick={() => pick(k)}>{name}</button
 			>
 		{/each}

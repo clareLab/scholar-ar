@@ -39,7 +39,7 @@ $$
 
 其中 $t \in n$ 取遍 $n$ 下的所有主题。主题、子领域和学科各自属于唯一的上级节点，份额因此沿层级向上相加，论文在 All 上的份额是 1。
 
-本文跟随的论文是 {{example.year|raw}} 年发表在 {{example.venue|raw}} 上的“{{example.title|raw}}”。流程按一条固定规则选出它。规则要求论文发表于 {{example.year|raw}} 年，所在 venue 当年在 {{tier_example.name|raw}} 中属于 T1，参考文献数量适中，至少一半落在这个学科，同时涉及几个子领域。它的 {{example.references|int}} 条参考文献中有 {{example.K|int}} 条引用带主要主题的作品，$K$ 即为 {{example.K|int}}。最大的一组有 {{example.largest.k|int}} 条，所引作品属于 {{example.largest.name|raw}}，因此论文在这个主题上的份额是 {{example.largest.k|int}}/{{example.K|int}}。
+本文跟随的论文是 {{example.year|raw}} 年发表在 {{example.venue|raw}} 上的“{{example.title|raw}}”。流程按一条固定规则选出它。规则要求论文发表于 {{example.year|raw}} 年，所在 venue 当年在 {{tier_example.name|raw}} 中属于 T1，参考文献数量适中，至少一半落在这个学科，同时涉及至少三个学科。它的 {{example.references|int}} 条参考文献中有 {{example.K|int}} 条引用带主要主题的作品，$K$ 即为 {{example.K|int}}。最大的一组有 {{example.largest.k|int}} 条，所引作品属于 {{example.largest.name|raw}}，因此论文在这个主题上的份额是 {{example.largest.k|int}}/{{example.K|int}}。
 
 @fig:apportion 把这些单位沿层级逐级相加。论文主要落在 {{tier_example.name|raw}}，{{example.K|int}} 条参考文献中有 {{example.fields[field=17].k|int}} 条在这里，所以它以 {{example.fields[field=17].k|int}}/{{example.K|int}} 的份额计入该学科。其余参考文献延伸到其他学科，排在前面的是 {{example.fields.1.name|raw}}（{{example.fields.1.k|int}} 条）和 {{example.fields.2.name|raw}}（{{example.fields.2.k|int}} 条）。后面各节跟随这篇论文在 {{tier_example.name|raw}} 中的情况。
 
@@ -105,7 +105,7 @@ venue 当年在哪些视图有论文，就在这些视图各有一档，因此�
 @fig:tiers 把规则用于 {{tier_example.year|raw}} 年的 {{tier_example.name|raw}}，当年候选池有 {{tier_example.pool|int}} 个 venue，论文量合计 {{tier_example.mass|int}} 篇。沿 $\varphi$ 的顺序，T1 止于第 {{tier_example.cuts.0|int}} 名，T2 止于第 {{tier_example.cuts.1|int}} 名，T3 止于第 {{tier_example.cuts.2|int}} 名。排在最前面的是其他范围的强势期刊，第一名 {{tier_example.lead.name|raw}} 在该学科的论文量为 {{tier_example.lead.mass|d1}} 篇。{{tier_example.cuts.0|int}} 个 T1 venue 中，论文量最大的 {{tier_example.heavy|int}} 个占 T1 论文量的 {{tier_example.heavy_share|pct1}}，最大的一个独占 {{t1.rows[view=field/17].top|pct1}}。T1 的 venue 合计占该学科带分数产出的 {{t1.rows[view=field/17].share|pct1}}，接近二十七分之一。{{example.venue|raw}} 在 T1 之列，所以在默认选择下，示例论文以 {{example.fields[field=17].k|int}}/{{example.K|int}} 的份额计入 {{tier_example.name|raw}}。
 
 ::: {#fig:tiers .figure .wide}
-{{tier_example.year|raw}} 年 {{tier_example.name|raw}} 候选池上的分档规则。venue 按 $\varphi$ 排列在对数横轴上，曲线是池中论文量的累计份额，按档着色。曲线与 1/27、1/9 和 1/3 三条线相交处就是各档的终点，图例给出每档的 venue 数。列表给出论文量最大的那些 T1 venue，附它们在这一顺序中的名次、$\varphi$ 和论文量。
+{{tier_example.year|raw}} 年 {{tier_example.name|raw}} 候选池上的分档规则。venue 按 $\varphi$ 排列在对数横轴上，曲线是池中论文量的累计份额，画在对数纵轴上，按档着色。曲线与 1/27、1/9 和 1/3 三条线相交处就是各档的终点，图例给出每档的 venue 数。列表给出论文量最大的那些 T1 venue，附它们在这一顺序中的名次、$\varphi$ 和论文量。
 :::
 
 # 选择
@@ -200,7 +200,7 @@ Excess 在参与拟合的机构上总和为零。拟合始终覆盖视图中的�
 默认选择下，All 视图的 $\beta$ 是 {{scaling.rows[view=all].slope|d2}}，拟合了 {{scaling.rows[view=all].n|int}} 个机构，因此一个机构的 Authors 是另一个的两倍时，它的预期 T1 Count 超过后者的两倍。@fig:scaling 画出这一拟合。各学科中，$\beta$ 最低的是 {{scaling.low.name|raw}}，为 {{scaling.low.slope|d2}}，最高的是 {{scaling.high.name|raw}}，为 {{scaling.high.slope|d2}}。在 All 视图中，Excess 最大的是 {{scaling.top.0.name|raw}}，比它 {{scaling.top.0.expected|int}} 篇的 Expected 高出 {{scaling.top.0.excess|int}} 篇。
 
 ::: {#fig:scaling .figure .wide}
-默认选择下 All 视图的 Count 与 Authors，双对数坐标，机构在 Count 为正的机构中按 Authors 名次等距抽取。直线是 Expected，在这组坐标上的斜率为 $\beta$ = {{scaling.rows[view=all].slope|d2}}。实心点在直线上方，Excess 为正，空心点在直线下方。菱形是按 Authors 每四分之一个数量级分组后的平均 Count，含 Count 为零的机构，横轴下方的条带给出每组中 Count 为零的比例。Authors 低于约 0.3 时，平均 Count 稳定在 0.01 篇左右，位于直线上方，差距在百分之一篇的量级。标出名字的是 Excess 最大的五个机构。第二个面板给出每个视图的 $\beta$，并在 1 处标出参考线。
+默认选择下 All 视图的 Count 与 Authors，双对数坐标，机构在 Count 为正的机构中按 Authors 名次等距抽取。直线是 Expected，在这组坐标上的斜率为 $\beta$ = {{scaling.rows[view=all].slope|d2}}。实心点在直线上方，Excess 为正，空心点在直线下方。菱形是按 Authors 每四分之一个数量级分组后的平均 Count，含 Count 为零的机构，横轴下方的条带给出每组中 Count 为零的比例。标出名字的是 Excess 最大的五个机构。第二个面板给出每个视图的 $\beta$，并在 1 处标出参考线。
 :::
 
 # 表格
@@ -209,9 +209,9 @@ Institutions 表列出国家筛选之后、该选择下 Count 为正的每个机
 
 展开机构会列出在其计入论文上得分为正的每个人。某人的得分是 Count 公式中只取此人那一项的结果，即对此人在该机构的计入论文求 $\sum_p s_C(p) / (N(p)\,|I(a, p)|)$。名字取自此人的作者记录，ORCID iD 取作品最多的那条记录，作品数相同时取作者 id 最小的一条。名字前的图标位于机构旗帜的位置，链接到 OpenAlex 上的这条记录。展开机构中的某人，会再列出此人在该机构的论文所在的 venue，以及此人在每个 venue 的得分。
 
-Venues 表列出 Count 为正的每个 venue，共三列。Tier 是它在每个所选年份的档，Score 是它在所选最后一年的分数。Count 按所选条目的年份，把该 venue 在勾选子节点上的论文量相加，用的正是分档时那些按子节点计的论文量。表格默认按 Count 排序，点击 Score 就按分数从高到低排序，没有分数的 venue 排在最后。Count 前有一个复选框，默认为空，勾选后保留 Count 高于均值的 venue。展开 venue 会列出该选择下在其中发表论文的机构。其中某个机构可以再展开，列出它在这个 venue 的作者。venue 的旗帜表示 OpenAlex 为其来源记录的国家，通常是出版者所在国。所选国家有机构在该选择下于某个 venue 发表论文时，表格才保留这个 venue。它的 Count 仍按所有国家相加，均值和名次只在保留的 venue 中计算。
+Venues 表列出 Count 为正的每个 venue，共三列。Tier 是它在每个所选年份的档，Score 是它在所选最后一年的分数。Count 按所选条目的年份，把该 venue 在勾选子节点上的论文量相加，用的正是分档时那些按子节点计的论文量。表格默认按 Count 排序，点击 Score 就按分数从高到低排序，没有分数的 venue 排在最后。Count 前有一个复选框，默认为空，勾选后保留 Count 高于均值的 venue。展开 venue 会列出该选择下、按国家筛选后在其中发表论文的机构。其中某个机构可以再展开，列出它在这个 venue 的作者。venue 的旗帜表示 OpenAlex 为其来源记录的国家，通常是出版者所在国。所选国家有机构在该选择下于某个 venue 发表论文时，表格才保留这个 venue。它的 Count 仍按所有国家相加，均值和名次只在保留的 venue 中计算。
 
-左侧面板有 Areas、Countries 和 Venues 三个列表，国家按 GeoNames [@r13] 归入各大洲。点击名称会打开该节点并列出其子节点，复选框改变选择。在 Countries 和 Venues 中，复选框作用于其节点下的整棵子树。在 Areas 中，墨色节点是当前视图。勾选路径上的另一个节点，它就成为视图，其子节点全部勾选。勾选某个列出节点而它的上级是另一个节点时，这个上级成为视图，只勾选该节点。视图改变时，每个条目重置为所在档的复选框状态。每行右侧的数字是所选年份内的份额。在 Countries 中，它是该国在当前选择下占视图 Count 的份额，分母是所有国家，与 Countries 的勾选无关。在 Areas 中，它是该节点在所选条目中占上级节点全部论文的份额。在 Venues 中，它是该 venue 在勾选子节点中占所在档论文的份额，一档则是它占四档合计的份额。份额保留两位有效数字，低于 0.01% 的写作 <0.01%。搜索结果中，Venues 列表在这一位置给出每个 venue 所在的档。
+左侧面板有 Areas、Countries 和 Venues 三个列表，国家按 GeoNames [@r13] 归入各大洲。点击名称会打开该节点并列出其子节点，复选框改变选择。在 Countries 和 Venues 中，复选框作用于其节点下的整棵子树。在 Areas 中，墨色节点是当前视图。勾选路径上的另一个节点，它就成为视图，其子节点全部勾选。勾选某个列出节点而它的上级是另一个节点时，这个上级成为视图，只勾选该节点。视图改变时，每个条目重置为所在档的复选框状态。每行右侧的数字是所选年份内的份额。在 Countries 中，它是该国在当前选择下占视图 Count 的份额，分母是所有机构，含国家为空的机构，与 Countries 的勾选无关。在 Areas 中，它是该节点在所选条目中占上级节点全部论文的份额。在 Venues 中，它是该 venue 在勾选子节点中占所在档论文的份额，一档则是它占四档合计的份额。份额保留两位有效数字，低于 0.01% 的写作 <0.01%。搜索结果中，Venues 列表在这一位置给出每个 venue 所在的档。
 
 顶栏右侧的两个图标保存当前视图。表格图标把打开的表格写成 CSV 文件，包含全部行，并附上每行的国家。海报图标在浏览器中生成当前选择下这一视图的海报，保存为一个 zip，内含 7200 × 9600 像素的 PNG、SVG，以及 5400 × 7200 磅、文字和图形均为矢量的 PDF。海报注明生成日期、OpenAlex 快照和数据版本。
 
@@ -237,7 +237,7 @@ Venues 表列出 Count 为正的每个 venue，共三列。Tier 是它在每个�
 
 ## 构成
 
-All 视图按每个 venue 的全部产出为它分档，各学科的论文再通过所在 venue 落入这些全局档。@fig:composition 按所在 venue 在 All 视图中的档，拆分每个学科在默认年份内的产出。上游学科的成果被科学中大量研究引用和借鉴。这些学科落在全局 T1 的产出比例最大，依次是 {{upstream.top.0.name|raw}}、{{upstream.top.1.name|raw}} 和 {{upstream.top.2.name|raw}}。{{upstream.bottom.0.name|raw}} 的比例最小，其次是 {{upstream.bottom.1.name|raw}}、{{upstream.bottom.2.name|raw}} 和 {{upstream.bottom.3.name|raw}} 等应用和临床学科。{{t1.year|raw}} 年，All 视图的 T1 包含 {{t1.rows[view=all].venues|int}} 个 venue，占当年带分数产出的 {{t1.rows[view=all].share|pct1}}，其中最大的 {{t1.rows[view=all].venue|raw}} 占这一 T1 的 {{t1.rows[view=all].top|pct1}}。
+All 视图按每个 venue 的全部产出为它分档，各学科的论文再通过所在 venue 落入这些全局档。@fig:composition 按所在 venue 在 All 视图中的档，拆分每个学科在默认年份内的产出。上游学科的成果被科学中大量研究引用和借鉴。这些学科落在全局 T1 的产出比例最大，依次是 {{upstream.top.0.name+upstream.top.1.name+upstream.top.2.name|list}}。{{upstream.bottom.0.name|raw}} 的比例最小，其次是 {{upstream.bottom.1.name+upstream.bottom.2.name+upstream.bottom.3.name|list}}。{{t1.year|raw}} 年，All 视图的 T1 包含 {{t1.rows[view=all].venues|int}} 个 venue，占当年带分数产出的 {{t1.rows[view=all].share|pct1}}，其中最大的 {{t1.rows[view=all].venue|raw}} 占这一 T1 的 {{t1.rows[view=all].top|pct1}}。
 
 ::: {#fig:composition .figure}
 默认年份内按 All 视图的档划分的论文量，All 一条，每个学科一条，按右侧标出的 T1 份额排序。学科的 T1 段是它在 All 视图中属于 T1 的 venue 上的产出。
@@ -253,10 +253,10 @@ All 和各学科 T1 Count 的集中度，范围是 T1 Count 为正的机构。�
 
 ## 国家
 
-国家份额按机构所属国家拆分 All 视图的 T1 Count，逐年计算。United States 的份额由 {{years.0|raw}} 年的 {{countries.series[country=US].share.0|pct1}} 降到 {{years.1|raw}} 年的 {{countries.series[country=US].share.21|pct1}}。同期 China 的份额由 {{countries.series[country=CN].share.0|pct1}} 升到 {{countries.series[country=CN].share.21|pct1}}。@fig:countries 画出 {{years.1|raw}} 年份额最大的几个国家、其他所有国家的合计，以及国家为空的机构。
+国家份额按机构所属国家拆分 All 视图的 T1 Count，逐年计算。United States 的份额由 {{years.0|raw}} 年的 {{countries.series[country=US].share.0|pct1}} 降到 {{years.1|raw}} 年的 {{countries.series[country=US].share.-1|pct1}}。同期 China 的份额由 {{countries.series[country=CN].share.0|pct1}} 升到 {{countries.series[country=CN].share.-1|pct1}}。@fig:countries 画出 {{years.1|raw}} 年份额最大的几个国家、其他所有国家的合计，以及国家为空的机构。
 
 ::: {#fig:countries .figure}
-按国家和年份的 T1 Count 份额，每个国家一条线，其他国家合计和国家为空的机构是两条虚线。这段时间份额变化最大的两个国家用黑色和蓝色画出。
+按国家和年份的 T1 Count 份额，画在对数纵轴上，每个国家一条线，其他国家合计和国家为空的机构是两条虚线。这段时间份额变化最大的两个国家用黑色和蓝色画出。
 :::
 
 # 网站如何运行

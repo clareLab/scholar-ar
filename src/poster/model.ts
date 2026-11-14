@@ -3,9 +3,6 @@ import { continentOf, familyOrder, nobody, painter } from "./palette";
 
 export type Data = Awaited<ReturnType<typeof poster>>;
 export type Institution = Data["institutions"][number];
-export type Nation = Data["countries"][number];
-export type Venue = Data["venues"][number];
-export type Child = Data["children"][number];
 
 export const halves = [1, 2, 3, 4];
 
@@ -35,7 +32,6 @@ export const derive = (data: Data) => {
 		nations.map((c) => c.count),
 		pool,
 	);
-	const listed = nations.slice(0, nationCut.end);
 	const paint = painter(data.order);
 	const colour = (code: string) => (code ? paint(code) : nobody);
 	const continent = (code: string) =>
@@ -55,13 +51,11 @@ export const derive = (data: Data) => {
 	);
 
 	const children = data.children;
-	const total = data.institutions.reduce((a, r) => a + r.count, 0);
 
 	return {
 		nations,
 		pool,
 		nationCut,
-		listed,
 		tail,
 		tailContinents,
 		shown,
@@ -70,7 +64,6 @@ export const derive = (data: Data) => {
 		mass,
 		venueCut,
 		children,
-		total,
 	};
 };
 

@@ -4,6 +4,7 @@ import {
 	fixed,
 	percent,
 	plural,
+	plurals,
 	scale,
 	signed,
 	snap,
@@ -150,8 +151,6 @@ export const childrenBlock = (
 	const hs = Math.max(10, snap(s * 0.86));
 	const level = data.levels.child ?? "child";
 	const grand = data.levels.grandchild;
-	const plural_ = (word: string) =>
-		word.endsWith("y") ? `${word.slice(0, -1)}ies` : `${word}s`;
 	const total = kids.reduce((a, k) => a + k.count, 0);
 	const nested = kids.some((k) => k.grandchildren.length);
 	const bandH = Math.round(s * 1.75);
@@ -316,15 +315,15 @@ export const childrenBlock = (
 	const checked = kids.length + data.zero.length;
 	const noteParts = [
 		data.zero.length
-			? `${plural(checked, level, plural_(level))}, ${whole(kids.length)} with Count`
-			: plural(kids.length, level, plural_(level)),
+			? `${plural(checked, level, plurals(level))}, ${whole(kids.length)} with Count`
+			: plural(kids.length, level, plurals(level)),
 	];
 	if (grand)
 		noteParts.push(
 			plural(
 				kids.reduce((a, k) => a + k.grandchildren.length, 0),
 				grand,
-				plural_(grand),
+				plurals(grand),
 			),
 		);
 	const heads = [
@@ -438,12 +437,12 @@ export const childrenBlock = (
 	const note = noteParts.join(", ");
 	const keys = [
 		"Width = share of Count",
-		...(grand ? [`Tiles = ${plural_(grand)} by Count in ${level} view`] : []),
+		...(grand ? [`Tiles = ${plurals(grand)} by Count in ${level} view`] : []),
 	];
 	return {
 		height: top + headH + used,
 		draw: (scene, x, y) => {
-			blockTitle(scene, x, y, full, plural_(level).toUpperCase(), note);
+			blockTitle(scene, x, y, full, plurals(level).toUpperCase(), note);
 			const base = y + cap(40, sansSemi);
 			let kx = x + full - measure(note, 28, sans) - 64;
 			for (const k of [...keys].reverse()) {

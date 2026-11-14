@@ -31,7 +31,7 @@ const about: About = await Bun.file(source).json();
 const make = async (lang: (typeof langs)[number]) => {
 	const say = words[lang];
 	const file = lang === "en" ? "about.md" : `about.${lang}.md`;
-	const text = resolve(await Bun.file(`${here}/${file}`).text(), about, {
+	const text = resolve(await Bun.file(`${here}/${file}`).text(), about, lang, {
 		year: new Date().getFullYear(),
 	});
 	const work = await mkdtemp(`${tmpdir()}/about-`);

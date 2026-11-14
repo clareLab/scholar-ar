@@ -46,10 +46,6 @@ export type Group = Record<string, number[] & number[][]>;
 
 export const api = import.meta.env.VITE_API as string;
 
-export const years = [2004, 2025];
-
-export const defaults = [2022, 2025];
-
 const memo = new Map<string, Promise<unknown>>();
 
 const once = <T>(key: string, make: () => Promise<T>) => {
@@ -68,14 +64,28 @@ export const forget = (view: string) => {
 			memo.delete(key);
 };
 
-export const drop = (view: string) => {
-	for (const key of memo.keys())
-		if (key.startsWith(`${view}/`)) memo.delete(key);
+export const drop = (prefix: string) => {
+	for (const key of memo.keys()) if (key.startsWith(prefix)) memo.delete(key);
+};
+
+export const retry = async <T>(make: () => Promise<T>) => {
+	for (let n = 0; ; n++) {
+		try {
+			return await make();
+		} catch (error) {
+			if (n === 3) throw error;
+			await new Promise((done) => setTimeout(done, 1024 << n));
+		}
+	}
 };
 
 const json = <T>(path: string) =>
 	once(path, () =>
-		fetch(`${api}/${path}`).then((r) => (r.ok ? r.json() : undefined)),
+		fetch(`${api}/${path}`).then((r) => {
+			if (r.ok) return r.json();
+			if (r.status === 404) return undefined;
+			throw new Error(`${r.status} ${path}`);
+		}),
 	) as Promise<T | undefined>;
 
 type Part = { file: AsyncBuffer; metadata: FileMetaData };
@@ -331,16 +341,16 @@ export const bundle = (v: number, years: number[]) =>
 
 export const swaps = (
 	shelf: Shelf,
-	flip: string[],
+	flip: Iterable<string>,
 	chosen: Set<number>,
 	span: number[],
 ) =>
-	flip
+	[...new Set(flip)]
 		.filter((key) => shelf.mass.has(key))
 		.map((key) => {
 			const [t, v] = shelf.mass.get(key) as [number, number, number];
 			return {
-				key: `${v} ${t}`,
+				key: `venue/${v}. ${t}`,
 				sign: chosen.has(t) ? -1 : 1,
 				read: () =>
 					bundle(
@@ -363,11 +373,13 @@ export const count = (
 	return sums;
 };
 
-export const expect = (counts: Float64Array, people: Float64Array) => {
+export const fit = (counts: Float64Array, people: Float64Array) => {
 	const index: number[] = [];
 	const logs: number[] = [];
 	let total = 0;
 	let weighted = 0;
+	let low = Number.POSITIVE_INFINITY;
+	let high = Number.NEGATIVE_INFINITY;
 	for (let i = 0; i < counts.length; i++) {
 		if (people[i] <= 0) continue;
 		const l = Math.log(people[i]);
@@ -375,20 +387,12 @@ export const expect = (counts: Float64Array, people: Float64Array) => {
 		logs.push(l);
 		total += counts[i];
 		weighted += counts[i] * l;
-	}
-	const out = new Float64Array(counts.length);
-	if (!total) return out;
-	let low = Number.POSITIVE_INFINITY;
-	let high = Number.NEGATIVE_INFINITY;
-	for (const l of logs) {
 		low = Math.min(low, l);
 		high = Math.max(high, l);
 	}
-	const weights = (beta: number) => {
-		const shift = beta * (beta > 0 ? high : low);
-		return logs.map((l) => Math.exp(beta * l - shift));
-	};
-	const mean = (beta: number) => {
+	const expected = new Float64Array(counts.length);
+	if (!total) return { expected };
+	const sums = (beta: number) => {
 		const shift = beta * (beta > 0 ? high : low);
 		let sum = 0;
 		let at = 0;
@@ -397,22 +401,32 @@ export const expect = (counts: Float64Array, people: Float64Array) => {
 			sum += x;
 			at += x * l;
 		}
-		return at / sum;
+		return { shift, sum, at };
 	};
 	let lo = -16;
 	let hi = 16;
 	for (let k = 0; k < 64; k++) {
 		const mid = (lo + hi) / 2;
-		if (mean(mid) < weighted / total) lo = mid;
+		const { sum, at } = sums(mid);
+		if (at / sum < weighted / total) lo = mid;
 		else hi = mid;
 	}
-	const w = weights((lo + hi) / 2);
-	const sum = w.reduce((a, x) => a + x, 0);
-	w.forEach((x, k) => {
-		out[index[k]] = (total * x) / sum;
+	const beta = (lo + hi) / 2;
+	const { shift, sum } = sums(beta);
+	logs.forEach((l, k) => {
+		expected[index[k]] = (total * Math.exp(beta * l - shift)) / sum;
 	});
-	return out;
+	if (low === high) return { expected };
+	return {
+		expected,
+		beta,
+		scale: (width: number) =>
+			(total / sum / 1e6) * Math.exp(beta * Math.log(width * 1e6) - shift),
+	};
 };
+
+export const expect = (counts: Float64Array, people: Float64Array) =>
+	fit(counts, people).expected;
 
 export const hundredths = (num: number, den: number) =>
 	(Math.round((100 * num) / den) / 100).toFixed(2);

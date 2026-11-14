@@ -1,3 +1,5 @@
+import { names } from "./poster/names";
+
 const files = import.meta.glob<string>(
 	"../node_modules/flag-icons/flags/4x3/??.svg",
 	{ eager: true, query: "?url&no-inline", import: "default" },
@@ -12,6 +14,4 @@ const urls = new Map(
 
 export const flag = (code: string) => urls.get(code);
 
-const names = new Intl.DisplayNames(["en"], { type: "region" });
-
-export const country = (code: string) => names.of(code) ?? code;
+export const country = (code: string) => names[code] ?? code;

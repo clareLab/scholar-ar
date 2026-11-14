@@ -1,13 +1,9 @@
 import { continents } from "../continents";
 import {
-	years as bounds,
 	count,
-	defaults,
 	ends,
-	expect,
+	fit,
 	type Group,
-	groups,
-	having,
 	type Meta,
 	type Node,
 	shelve,
@@ -17,31 +13,17 @@ import {
 	topics,
 	whole,
 } from "../data";
-
+import {
+	years as bounds,
+	defaults,
+	link,
+	origin,
+	type Selection,
+} from "../state";
+import { lander, lands, listing, picker, rank, span, stock } from "../tables";
 import { nation } from "./format";
 
-const depth = 8;
 const shortlist = 4;
-
-export type Selection = {
-	view: number;
-	from: number;
-	to: number;
-	tiers: number[];
-	flip: string[];
-	off: number[];
-	at: string[];
-};
-
-export const origin = "https://ar.clarelab.moe";
-
-export const lands = (meta: Meta) => {
-	const seen = new Set([...meta.institutions.country, ...meta.venues.country]);
-	return continents
-		.flatMap(([, codes]) => codes.split(" "))
-		.filter((code) => seen.has(code))
-		.sort();
-};
 
 const places = (meta: Meta, at: string[]) => {
 	const present = new Set(lands(meta));
@@ -59,71 +41,31 @@ const places = (meta: Meta, at: string[]) => {
 
 const slug = (text: string) =>
 	text
+		.normalize("NFD")
+		.replace(/\p{M}/gu, "")
 		.toLowerCase()
 		.replace(/[^a-z0-9]+/g, "-")
 		.replace(/^-|-$/g, "");
 
 const address = (meta: Meta, node: Node, s: Selection) => {
-	const query: string[] = [];
 	const stem = [
 		`allrankings${node.id ? `-${node.id}` : ""}-${slug(node.name)}`,
 	];
 	const listed = (key: string, values: (string | number)[]) => {
-		query.push(`${key}=${values.join(",")}`);
 		stem.push(
 			`${key}-${values.length > 4 ? values.length : values.map((v) => slug(`${v}`)).join("-")}`,
 		);
 	};
-	if (s.from !== defaults[0]) query.push(`from=${s.from}`);
-	if (s.to !== defaults[1]) query.push(`to=${s.to}`);
 	if (s.from !== defaults[0] || s.to !== defaults[1])
 		stem.push(`${s.from}-${s.to}`);
-	if (s.tiers.join("") !== "1") {
-		query.push(`tiers=${s.tiers.join("")}`);
-		stem.push(`t${s.tiers.join("")}`);
-	}
+	if (s.tiers.join("") !== "1") stem.push(`t${s.tiers.join("")}`);
 	if (s.flip.length) listed("flip", s.flip);
 	if (s.off.length) listed("off", s.off);
 	if (s.at.length !== lands(meta).length) listed("in", s.at);
-	const path = `/${node.id ? `${node.id}/` : ""}institutions/`;
 	return {
-		url: `${origin}${path}${query.length ? `?${query.join("&")}` : ""}`,
+		url: `${origin}${link(s, lands(meta))}`,
 		stem: stem.join("-"),
 	};
-};
-
-const span = (from: number, to: number) =>
-	Array.from({ length: to - from + 1 }, (_, k) => from + k);
-
-const rank = <T extends { rank: number }>(
-	rows: T[],
-	key: (row: T) => number,
-	tie: (a: T, b: T) => number,
-) => {
-	rows.sort((a, b) => key(b) - key(a) || tie(a, b));
-	rows.forEach((row, k) => {
-		row.rank = k && key(row) === key(rows[k - 1]) ? rows[k - 1].rank : k + 1;
-	});
-	return rows;
-};
-
-const curve = (sums: Float64Array, people: Float64Array, size: number) => {
-	const expected = expect(sums, people);
-	let low = -1;
-	let high = -1;
-	let total = 0;
-	for (let i = 0; i < people.length; i++) {
-		if (people[i] <= 0) continue;
-		total += sums[i];
-		if (low < 0 || people[i] < people[low]) low = i;
-		if (high < 0 || people[i] > people[high]) high = i;
-	}
-	const beta =
-		Math.log(expected[high] / expected[low]) /
-		Math.log(people[high] / people[low]);
-	const authors = people[high] / size / 1e6;
-	const scale = expected[high] / 1e6 / authors ** beta;
-	return { expected, beta, total, scale };
 };
 
 const bundles = (
@@ -154,17 +96,8 @@ const credited = async (
 	]);
 	const sums = count(counts, swapped, topics(node, [...off]), off, size);
 	const people = tally(faculty, size, "f", off);
-	return { sums, people, ...curve(sums, people, years.length) };
+	return { sums, people, ...fit(sums, people) };
 };
-
-const presence = (node: Node, years: number[], all: boolean) =>
-	groups(
-		`views/${node.level}/${node.id}/venues.parquet`,
-		(stat) =>
-			having({ year: years })(stat) &&
-			(!node.children.length || (stat("child")[0] === 0) === all),
-		["countries"],
-	);
 
 export const poster = async (meta: Meta, s: Selection) => {
 	const { nodes, institutions, venues } = meta;
@@ -175,10 +108,8 @@ export const poster = async (meta: Meta, s: Selection) => {
 	const flips = new Set(s.flip);
 	const off = new Set(s.off);
 	const every = s.at.length === lands(meta).length;
-	const at = new Set(s.at);
-	const land = (code: string) => every || at.has(code);
-	const picked = (t: number, v: number) =>
-		chosen.has(t) !== flips.has(`${t}.${venues.id[v]}`);
+	const land = lander(new Set(s.at), lands(meta));
+	const picked = picker(chosen, flips, venues.id);
 	const size = institutions.id.length;
 	const all = whole(node, off);
 	const empty = node.children.every((child) => off.has(child.id));
@@ -196,12 +127,25 @@ export const poster = async (meta: Meta, s: Selection) => {
 			? []
 			: await stalls(node, years, false);
 	const marked: Group[] = merged
-		? await presence(node, years, true)
+		? await stalls(node, years, true, ["countries"])
 		: empty
 			? []
-			: await presence(node, years, false);
+			: await stalls(node, years, false, ["countries"]);
 
 	const main = await credited(meta, node, shelf, s, off);
+
+	const byName = (a: { name: string }, b: { name: string }) =>
+		a.name.localeCompare(b.name, "en");
+
+	const listed = (part: Awaited<ReturnType<typeof credited>>) =>
+		rank(
+			listing(meta, part.sums, part.people, part.expected, years.length, land),
+			(row) => row.excess,
+			byName,
+		);
+
+	const rows = listed(main);
+	if (!rows.some((row) => row.people > 0)) throw new Error("empty selection");
 
 	const under = topics(node, [...off]);
 	const yearly = await Promise.all(
@@ -214,31 +158,10 @@ export const poster = async (meta: Meta, s: Selection) => {
 		}),
 	);
 
-	const byName = (a: { name: string }, b: { name: string }) =>
-		a.name.localeCompare(b.name, "en");
-
-	const listed = (part: Awaited<ReturnType<typeof credited>>) => {
-		const rows = [];
-		for (let i = 0; i < size; i++) {
-			const n = part.sums[i];
-			if (n <= 0 || !land(institutions.country[i])) continue;
-			rows.push({
-				i,
-				rank: 0,
-				name: institutions.name[i],
-				n,
-				people: part.people[i],
-				e: part.expected[i],
-			});
-		}
-		return rank(rows, (row) => row.n - row.e, byName);
-	};
-
-	const rows = listed(main);
 	const countRank = new Map(
 		rank(
 			rows.map((row) => ({ ...row })),
-			(row) => row.n,
+			(row) => row.count,
 			byName,
 		).map((row) => [row.i, row.rank]),
 	);
@@ -246,13 +169,13 @@ export const poster = async (meta: Meta, s: Selection) => {
 		id: institutions.id[row.i],
 		name: row.name,
 		country: institutions.country[row.i],
-		count: row.n,
-		authors: row.people / years.length,
+		count: row.count,
+		authors: row.authors,
 		per: row.people
-			? Math.round((100 * (row.n * years.length)) / row.people)
+			? Math.round((100 * (row.count * years.length)) / row.people)
 			: 0,
-		excess: row.n - row.e,
-		expected: row.e,
+		excess: row.excess,
+		expected: main.expected[row.i],
 		rankExcess: row.rank,
 		rankCount: countRank.get(row.i) as number,
 		yearly: yearly.map((sums) => sums[row.i]),
@@ -277,17 +200,18 @@ export const poster = async (meta: Meta, s: Selection) => {
 	for (let i = 0; i < size; i++) {
 		const code = institutions.country[i];
 		const n = main.sums[i];
+		const fitted = main.people[i] > 0;
 		const touched = n > 0 || yearly.some((sums) => sums[i] > 0);
-		if (!touched) continue;
+		if (!touched && !fitted) continue;
 		let into = rest;
 		if (land(code)) {
 			into = nations.get(code) ?? bucket();
 			nations.set(code, into);
 		}
+		if (fitted) into.excess += n - main.expected[i];
 		if (n > 0) {
 			into.institutions++;
 			into.n += n;
-			into.excess += n - main.expected[i];
 			pool += n;
 		}
 		yearly.forEach((sums, k) => {
@@ -322,26 +246,8 @@ export const poster = async (meta: Meta, s: Selection) => {
 		.sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], "en"))
 		.map(([code]) => code);
 
-	type Stock = { v: number; n: number; rank: number; tiers: string[] };
-	const stocks = new Map<number, Stock>();
-	const seen = new Set<number>();
-	for (const [k, { year, child, v, tier: t, mass }] of wares.entries()) {
-		const reach = marked[k].countries as unknown as string[][];
-		for (let r = 0; r < v.length; r++) {
-			if (child && off.has(child[r])) continue;
-			let row = stocks.get(v[r]);
-			if (!row) {
-				row = { v: v[r], n: 0, rank: 0, tiers: years.map(() => "") };
-				stocks.set(v[r], row);
-			}
-			row.tiers[year[r] - s.from] = `${t[r]}`;
-			if (!picked(t[r], v[r])) continue;
-			row.n += mass[r];
-			if (reach[r].some(land)) seen.add(v[r]);
-		}
-	}
-	const stock = rank(
-		[...stocks.values()].filter((row) => row.n > 0 && seen.has(row.v)),
+	const stocks = rank(
+		stock(wares, marked, off, years, picked, land),
 		(row) => row.n,
 		(a, b) => venues.name[a.v].localeCompare(venues.name[b.v], "en"),
 	);
@@ -358,12 +264,7 @@ export const poster = async (meta: Meta, s: Selection) => {
 			row[year[r] - history[0]] = `${t[r]}`;
 			before.set(v[r], row);
 		}
-	const mass = stock.reduce((a, row) => a + row.n, 0);
-	const runs: number[] = [];
-	stock.forEach((row, k) => {
-		runs.push((runs[k - 1] ?? 0) + row.n);
-	});
-	const venueRows = stock.map((row) => ({
+	const venueRows = stocks.map((row) => ({
 		id: venues.id[row.v],
 		rank: row.rank,
 		name: venues.name[row.v],
@@ -372,14 +273,6 @@ export const poster = async (meta: Meta, s: Selection) => {
 		past: before.get(row.v) ?? history.map(() => ""),
 		count: row.n,
 	}));
-	const marks: { k: number; row: number }[] = [];
-	for (let k = 1; k <= depth; k++) {
-		const reach = runs.findIndex((run) => (mass - run) * 2 ** k <= mass);
-		if (reach < 0 || reach >= runs.length - 1) break;
-		const last = marks[marks.length - 1];
-		if (last?.row === reach + 1) last.k = k;
-		else marks.push({ k, row: reach + 1 });
-	}
 
 	const topical = async (child: Node) => {
 		const [up, down] = await ends(child, "counts", "n", [s.from, s.to], false, {
@@ -411,15 +304,15 @@ export const poster = async (meta: Meta, s: Selection) => {
 			return {
 				id: child.id,
 				name: child.name,
-				count: leaders.reduce((a, row) => a + row.n, 0),
+				count: leaders.reduce((a, row) => a + row.count, 0),
 				grandchildren: child.children.length ? await topical(child) : [],
 				leaders: leaders.slice(0, shortlist).map((row) => ({
 					id: institutions.id[row.i],
 					name: row.name,
 					country: institutions.country[row.i],
 					rank: row.rank,
-					count: row.n,
-					excess: row.n - row.e,
+					count: row.count,
+					excess: row.excess,
 				})),
 			};
 		}),
@@ -455,19 +348,15 @@ export const poster = async (meta: Meta, s: Selection) => {
 			institutions: institutionRows.length,
 			countries: countries.filter((c) => c.code && c.institutions > 0).length,
 			venues: venueRows.length,
-			years: [s.from, s.to],
 			tiers: s.tiers,
 		},
-		model: {
-			beta: main.beta,
-			total: main.total,
-			scale: main.scale,
-		},
+		model: main.scale
+			? { beta: main.beta, scale: main.scale(years.length) }
+			: null,
 		institutions: institutionRows,
 		countries,
 		others,
 		venues: venueRows,
-		marks,
 		children,
 		zero,
 	};

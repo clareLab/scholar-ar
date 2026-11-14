@@ -34,26 +34,6 @@ export const oklch = (l: number, c: number, h: number) => {
 		.join("")}`;
 };
 
-const channel = (v: number) => {
-	const c = v / 255;
-	return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
-};
-
-export const luminance = (hex: string) => {
-	const [r, g, b] = [1, 3, 5].map((k) =>
-		channel(Number.parseInt(hex.slice(k, k + 2), 16)),
-	);
-	return 0.2126 * r + 0.7152 * g + 0.0722 * b;
-};
-
-export const contrast = (a: string, b: string) => {
-	const [x, y] = [luminance(a), luminance(b)].sort((p, q) => q - p);
-	return (x + 0.05) / (y + 0.05);
-};
-
-export const textOn = (hex: string) =>
-	contrast(hex, ink) >= contrast(hex, paper) ? ink : paper;
-
 const below = 32;
 const above = 252;
 const steps = [

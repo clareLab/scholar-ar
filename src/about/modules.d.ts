@@ -12,3 +12,8 @@ declare module "virtual:snapshot" {
 	const snapshot: string;
 	export default snapshot;
 }
+
+declare module "virtual:years" {
+	export const years: number[];
+	export const defaults: number[];
+}

@@ -1,5 +1,5 @@
 import snapshot from "virtual:snapshot";
-import type { Selection } from "./data";
+import type { Selection } from "../state";
 import type { Raster } from "./pdf";
 import { frame } from "./svg";
 import type { Answer, Ask, Band, Reply } from "./worker";
@@ -75,29 +75,13 @@ const band = (
 	return data;
 };
 
-const save = (blob: Blob, name: string) => {
-	const anchor = document.createElement("a");
-	anchor.href = URL.createObjectURL(blob);
-	anchor.download = name;
-	anchor.click();
-	setTimeout(() => URL.revokeObjectURL(anchor.href), 65536);
-};
-
 export const make = (
-	state: Selection,
+	selection: Selection,
 	api: string,
 	flag: (code: string) => string | undefined,
+	save: (blob: Blob, name: string) => void,
 ) =>
 	new Promise<void>((done, fail) => {
-		const selection: Selection = {
-			view: state.view,
-			from: state.from,
-			to: state.to,
-			tiers: [...state.tiers],
-			flip: [...state.flip],
-			off: [...state.off].sort((a, b) => a - b),
-			at: [...state.at],
-		};
 		const worker = new Worker(new URL("./worker.ts", import.meta.url), {
 			type: "module",
 		});

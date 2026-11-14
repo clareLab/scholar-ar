@@ -4,8 +4,7 @@
 		api,
 		bundle,
 		count,
-		credit,
-		defaults,
+		drop,
 		ends,
 		forget,
 		type Group,
@@ -19,6 +18,7 @@
 		type Node,
 		type People,
 		read as part,
+		retry,
 		shelve,
 		slot,
 		stalls,
@@ -27,20 +27,32 @@
 		tally,
 		topics,
 		whole as every,
-		years as bounds,
 	} from "./data";
 	import { continents } from "./continents";
-	import { type Lang, words } from "./about/words";
+	import { words } from "./about/words";
 	import { country, flag } from "./flags";
 	import {
 		about as described,
 		apply,
-		parse,
 		plain,
+		save,
 		type Ssr,
 		view as viewed,
-		where,
 	} from "./page";
+	import {
+		years as bounds,
+		means,
+		type Mean,
+		read as decode,
+		selection,
+		sorts,
+		type State,
+		type Tab,
+		tiers,
+		url as encode,
+		where,
+	} from "./state";
+	import * as tables from "./tables";
 	import Panel, {
 		badge,
 		more,
@@ -50,8 +62,19 @@
 		whole,
 	} from "./Panel.svelte";
 
-	let { meta, ssr, onready }: { meta: Meta; ssr?: Ssr; onready?: () => void } =
-		$props();
+	let {
+		meta,
+		empty = new Set(),
+		ssr,
+		onready,
+		onfail,
+	}: {
+		meta: Meta;
+		empty?: Set<number>;
+		ssr?: Ssr;
+		onready?: () => void;
+		onfail?: () => void;
+	} = $props();
 
 	const { nodes, institutions, venues } = $derived(meta);
 	const tabs = [
@@ -59,139 +82,44 @@
 		["venues", "Venues"],
 		["about", "About"],
 	] as const;
-	const sorts = [
-		["count", "Count"],
-		["authors", "Authors"],
-		["ratio", "Per author"],
-		["excess", "Excess"],
-	] as const;
-	const tiers = [1, 2, 3, 4];
-	const means = ["count", "authors", "venues"] as const;
-
-	type Tab = (typeof tabs)[number][0];
-	type Sort = (typeof sorts)[number][0];
-	type Mean = (typeof means)[number];
-	type State = {
-		view: number;
-		from: number;
-		to: number;
-		tiers: number[];
-		flip: string[];
-		off: number[];
-		at: string[];
-		above: Mean[];
-		tab: Tab;
-		lang: Lang;
-		sort: Sort;
-		by: "count" | "score";
-		inst?: number;
-		author?: number;
-		venue?: number;
-		firm?: number;
-	};
 
 	const fit = (k: number) => 2 ** Math.max(6, Math.ceil(Math.log2(k + 1)));
 
-	const span = (from: number, to: number) =>
-		Array.from({ length: to - from + 1 }, (_, k) => from + k);
-
-	const list = (value: string | null) =>
-		(value ?? "").split(",").filter(Boolean);
-
-	const lands = $derived.by(() => {
-		const seen = new Set([...institutions.country, ...venues.country]);
-		return continents
-			.flatMap(([, codes]) => codes.split(" "))
-			.filter((code) => seen.has(code))
-			.sort();
-	});
+	const lands = $derived(tables.lands(meta));
 
 	const read = (
 		at: { pathname: string; search: string } = ssr
 			? { pathname: ssr.path, search: "" }
 			: location,
-	): State => {
-		const q = new URLSearchParams(at.search);
-		const place = parse(at.pathname, nodes) ?? {
-			tab: "institutions",
-			view: 0,
-			lang: "en",
-		};
-		const int = (key: string, or: number) => {
-			const value = Number(q.get(key) ?? Number.NaN);
-			return Number.isInteger(value) ? value : or;
-		};
-		const id = (tab: Tab, key: string) =>
-			place.tab === tab && q.has(key) ? int(key, -1) : undefined;
-		const [low, high] = bounds;
-		const clamp = (year: number) => Math.min(Math.max(year, low), high);
-		const from = clamp(int("from", defaults[0]));
-		return {
-			view: place.view,
-			from,
-			to: Math.max(clamp(int("to", defaults[1])), from),
-			tiers: tiers.filter((t) => (q.get("tiers") ?? "1").includes(`${t}`)),
-			flip: list(q.get("flip")).filter((key) => /^[1-4]\.\d+$/.test(key)),
-			off: list(q.get("off")).map(Number),
-			at: q.has("in")
-				? lands.filter((code) => list(q.get("in")).includes(code))
-				: lands,
-			above: means.filter((key) => list(q.get("above")).includes(key)),
-			tab: place.tab,
-			lang: place.lang,
-			sort: sorts.find(([key]) => key === q.get("sort"))?.[0] ?? "excess",
-			by: q.get("by") === "score" ? "score" : "count",
-			inst: id("institutions", "inst"),
-			author: id("institutions", "author"),
-			venue: id("venues", "venue"),
-			firm: id("venues", "inst"),
-		};
-	};
+	) => decode(at, nodes, lands);
 
-	const url = (state: State) => {
-		const parts = [];
-		if (state.from !== defaults[0]) parts.push(`from=${state.from}`);
-		if (state.to !== defaults[1]) parts.push(`to=${state.to}`);
-		if (state.tiers.join("") !== "1")
-			parts.push(`tiers=${state.tiers.join("")}`);
-		if (state.flip.length) parts.push(`flip=${state.flip.join(",")}`);
-		if (state.off.length) parts.push(`off=${state.off.join(",")}`);
-		if (state.at.length !== lands.length)
-			parts.push(`in=${state.at.join(",")}`);
-		if (state.above.length) parts.push(`above=${state.above.join(",")}`);
-		if (state.sort !== "excess") parts.push(`sort=${state.sort}`);
-		if (state.by !== "count") parts.push(`by=${state.by}`);
-		const keys = {
-			institutions: { inst: state.inst, author: state.author },
-			venues: { venue: state.venue, inst: state.firm },
-			about: {},
-		}[state.tab];
-		for (const [key, id] of Object.entries(keys))
-			if (id !== undefined) parts.push(`${key}=${id}`);
-		return where(state) + (parts.length ? `?${parts.join("&")}` : "");
-	};
+	const url = (state: State) => encode(state, lands);
 
 	const first = read();
 
 	let s = $state(first);
 
+	let placed = where(first);
+
 	$effect(() => {
 		const next = url(s);
+		const path = where(s);
 		if (next !== location.pathname + location.search)
-			history.replaceState(null, "", next);
+			history[path === placed ? "replaceState" : "pushState"](null, "", next);
+		placed = path;
 	});
 
 	const rescope = (view: number, off: number[]) => {
-		const next = { ...s, view, flip: [], off };
-		history.pushState(null, "", url(next));
-		s = next;
+		let at = nodes.get(view) as Node;
+		while (empty.has(at.id) && at.parent) at = at.parent;
+		s = { ...s, view: at.id, flip: [], off };
 	};
 
 	const flipped = <T,>(keys: T[], key: T) =>
 		keys.includes(key) ? keys.filter((k) => k !== key) : [...keys, key];
 
 	const node = $derived(nodes.get(s.view) as Node);
-	const years = $derived(span(s.from, s.to));
+	const years = $derived(tables.span(s.from, s.to));
 	const base = $derived(`views/${node.level}/${node.id}`);
 	const range = $derived(`${s.from}-${s.to}`);
 	const chosen = $derived(new Set(s.tiers));
@@ -215,9 +143,8 @@
 				? nested
 				: -1,
 	);
-	const land = (code: string) => at.size === lands.length || at.has(code);
-	const picked = (t: number, v: number) =>
-		chosen.has(t) !== flips.has(`${t}.${venues.id[v]}`);
+	const land = $derived(tables.lander(at, lands));
+	const picked = $derived(tables.picker(chosen, flips, venues.id));
 	const all = $derived(every(node, off));
 
 	let got = $derived.by(() => {
@@ -227,6 +154,15 @@
 
 	$effect(() => forget(base));
 
+	let failed = $state.raw(new Set<string>());
+	const flying = new Set<string>();
+	let kept = new Set<string>();
+
+	const stale = (key: string) => {
+		const file = key.match(/^(?:venue|institution)\/\d+\./)?.[0];
+		return file !== undefined && !kept.has(file);
+	};
+
 	const take = <T,>(key: string, make: () => Promise<T>) => {
 		if (got.has(key)) return got.get(key) as T;
 		if (ssr) {
@@ -235,10 +171,31 @@
 			return;
 		}
 		const view = base;
-		make().then((value) => {
-			if (view === base && !got.has(key)) got = new Map(got).set(key, value);
-		});
+		const flight = `${view} ${key}`;
+		if (failed.has(key) || flying.has(flight)) return;
+		flying.add(flight);
+		retry(make).then(
+			(value) => {
+				flying.delete(flight);
+				if (view === base && !got.has(key) && !stale(key))
+					got = new Map(got).set(key, value);
+			},
+			(error) => {
+				flying.delete(flight);
+				console.error(error);
+				failed = new Set(failed).add(key);
+			},
+		);
 	};
+
+	$effect(() => {
+		void url(s);
+		untrack(() => {
+			if (failed.size) failed = new Set();
+		});
+	});
+
+	const broken = $derived(failed.size > 0);
 
 	const cells = $derived(
 		take(`${base}/venues ${range}`, () => stalls(node, years, true)),
@@ -280,14 +237,14 @@
 
 	const shelf = $derived.by(() => {
 		shelved = cells ?? shelved;
-		return shelve(shelved, venues.id);
+		return shelve(cells ?? (broken ? [] : shelved), venues.id);
 	});
 
 	const bundles = $derived(
-		(cells ? swaps(shelf, s.flip, chosen, years) : []).map(
+		(cells ? swaps(shelf, flips, chosen, years) : []).map(
 			({ key, sign, read }) => ({
 				sign,
-				files: take(`${base}/venue ${key} ${range}`, read),
+				files: take(`${key} ${range}`, read),
 			}),
 		),
 	);
@@ -306,31 +263,8 @@
 			(s.tab !== "venues" || Boolean(wares && marks && scores)),
 	);
 
-	type Row = {
-		i: number;
-		rank: number;
-		count: number;
-		authors: number;
-		people: number;
-		ratio: number;
-		excess: number;
-		name: string;
-	};
-
 	const mean = <T,>(rows: T[], value: (row: T) => number) =>
 		rows.reduce((sum, row) => sum + value(row), 0) / rows.length;
-
-	const rank = <T extends { rank: number }>(
-		rows: T[],
-		key: (row: T) => number,
-		tie: (a: T, b: T) => number,
-	) => {
-		rows.sort((a, b) => key(b) - key(a) || tie(a, b));
-		rows.forEach((row, k) => {
-			row.rank = k && key(row) === key(rows[k - 1]) ? rows[k - 1].rank : k + 1;
-		});
-		return rows;
-	};
 
 	const sums = $derived(
 		ready
@@ -346,43 +280,25 @@
 
 	const listed = $derived.by(() => {
 		if (!sums) return undefined;
-		const size = institutions.id.length;
-		const people = tally(faculty ?? [[], []], size, "f", off);
+		const people = tally(faculty ?? [[], []], institutions.id.length, "f", off);
 		const expected = expect(sums, people);
-		const rows: Row[] = [];
-		for (let i = 0; i < size; i++) {
-			const n = sums[i];
-			if (n <= 0 || !land(institutions.country[i])) continue;
-			const sum = people[i];
-			const f = sum / years.length;
-			rows.push({
-				i,
-				rank: 0,
-				count: n,
-				authors: f,
-				people: sum,
-				ratio: f ? n / f : 0,
-				excess: n - expected[i],
-				name: institutions.name[i],
-			});
-		}
-		return rows;
+		return tables.listing(meta, sums, people, expected, years.length, land);
 	});
 
-	let last: Row[] = [];
+	let last: tables.Row[] = [];
 
 	const table = $derived.by(() => {
 		const rows = listed;
-		if (!rows) return last;
+		if (!rows) return broken ? [] : last;
 		const floors = (["count", "authors"] as const)
 			.filter((key) => above.has(key))
 			.map((key) => [key, mean(rows, (row) => row[key])] as const);
-		last = rank(
+		last = tables.rank(
 			rows
 				.filter((row) => floors.every(([key, m]) => row[key] > m))
 				.map((row) => ({ ...row })),
 			(row) => row[s.sort],
-			(a, b) => a.name.localeCompare(b.name),
+			(a, b) => tables.collate(a.name, b.name),
 		);
 		return last;
 	});
@@ -433,7 +349,7 @@
 		const want =
 			inside < 0 ? sought : new Map(stays.map((year) => [year, [inside]]));
 		return take(
-			`institution ${host} ${base} ${range} ${s.tiers} ${s.flip} ${inside}`,
+			`institution/${host}. ${base} ${range} ${s.tiers} ${s.flip} ${inside}`,
 			() =>
 				groups(`institution/${host}.parquet`, (stat) =>
 					holds(want.get(stat("year")[0]), stat("v")),
@@ -442,27 +358,14 @@
 	});
 	const roll = $derived(`institution/${host}.people.parquet`);
 	const roster = $derived(
-		host < 0 ? undefined : take(`roster ${host}`, () => starts(roll)),
+		host < 0
+			? undefined
+			: take(`institution/${host}. roster`, () => starts(roll)),
 	);
 
 	const team = $derived.by(() => {
 		if (!crew || !roster) return [];
-		const sums = credit(
-			crew,
-			under,
-			"a",
-			(r, g) => counted(g.v[r], g.year[r]) && (inside < 0 || g.v[r] === inside),
-			new Float64Array(roster[roster.length - 1]),
-		);
-		const rows: { a: number; n: number; rank: number }[] = [];
-		sums.forEach((n, a) => {
-			if (n > 0) rows.push({ a, n, rank: 0 });
-		});
-		return rank(
-			rows,
-			(row) => row.n,
-			(a, b) => a.a - b.a,
-		);
+		return tables.team(crew, under, counted, inside, roster[roster.length - 1]);
 	});
 
 	let crowd = $derived.by(() => {
@@ -486,7 +389,7 @@
 			need.add(k);
 		}
 		for (const k of need) {
-			const got = take(`people ${host} ${k}`, () =>
+			const got = take(`institution/${host}. people ${k}`, () =>
 				part<People>(roll, k, ["a", "name"]),
 			);
 			got?.a.forEach((id, j) => {
@@ -508,7 +411,7 @@
 	const staff = $derived(
 		team
 			.slice(0, known)
-			.sort((a, b) => b.n - a.n || named(a.a).localeCompare(named(b.a)))
+			.sort((a, b) => b.n - a.n || tables.collate(named(a.a), named(b.a)))
 			.slice(0, crowd),
 	);
 
@@ -520,25 +423,7 @@
 
 	const paths = $derived.by(() => {
 		if (pick < 0 || inside >= 0 || !crew) return [];
-		const who = staff[pick].a;
-		const sums = credit(
-			crew,
-			under,
-			"a",
-			(r, g) => counted(g.v[r], g.year[r]),
-			new Float64Array(venues.id.length),
-			1,
-			(g, r, a) => (a === who ? g.v[r] : -1),
-		);
-		const rows: { v: number; n: number; rank: number }[] = [];
-		sums.forEach((n, v) => {
-			if (n > 0) rows.push({ v, n, rank: 0 });
-		});
-		return rank(
-			rows,
-			(row) => row.n,
-			(a, b) => venues.name[a.v].localeCompare(venues.name[b.v]),
-		);
+		return tables.paths(meta, crew, under, counted, staff[pick].a);
 	});
 
 	let reach = $derived.by(() => {
@@ -546,24 +431,36 @@
 		return 64;
 	});
 
+	const index = $derived.by(() => {
+		if (host < 0 || s.author === undefined) return undefined;
+		const files = take(`institution/${host}. ids`, () =>
+			groups<{ a: number[] }>(roll, () => true, ["a"]),
+		);
+		if (!files) return undefined;
+		let at = 0;
+		for (const { a } of files) {
+			const k = a.indexOf(s.author);
+			if (k >= 0) return at + k;
+			at += a.length;
+		}
+		return -1;
+	});
+
 	$effect(() => {
 		if (s.tab !== "institutions" || s.author === undefined) return;
 		const wait = !crew || !roster || known < edge;
 		if (open >= 0 && (wait || pick >= 0)) return;
-		if (open >= 0 && crowd < team.length) crowd *= 2;
-		else {
+		if (open >= 0 && index === undefined) return;
+		const k = open < 0 ? -1 : team.findIndex((row) => row.a === index);
+		if (k < 0) {
 			s.author = undefined;
 			crowd = 64;
+			return;
 		}
+		let g = k;
+		while (g && team[g - 1].n === team[k].n) g--;
+		crowd = Math.max(crowd * 2, fit(g));
 	});
-
-	type Stock = {
-		v: number;
-		n: number;
-		rank: number;
-		tiers: string[];
-		score?: number;
-	};
 
 	const score = (v: number) => {
 		for (const group of scores ?? []) {
@@ -577,67 +474,33 @@
 			? ""
 			: `${Math.floor(n / 1e4)}.${`${n % 1e4}`.padStart(4, "0")}`;
 
-	let stocked: Stock[] = [];
+	let stocked: tables.Stock[] = [];
 
 	const stock = $derived.by(() => {
-		if (!wares || !marks) return stocked;
-		const rows = new Map<number, Stock>();
-		const seen = new Set<number>();
-		for (const [k, { year, child, v, tier: t, mass }] of wares.entries()) {
-			const countries = marks[k].countries as unknown as string[][];
-			for (let r = 0; r < v.length; r++) {
-				if (child && off.has(child[r])) continue;
-				let row = rows.get(v[r]);
-				if (!row) {
-					const tiers = years.map(() => "");
-					row = { v: v[r], n: 0, rank: 0, tiers, score: score(v[r]) };
-					rows.set(v[r], row);
-				}
-				row.tiers[year[r] - s.from] = `${t[r]}`;
-				if (!picked(t[r], v[r])) continue;
-				row.n += mass[r];
-				if (countries[r].some(land)) seen.add(v[r]);
-			}
-		}
-		const listed = [...rows.values()].filter(
-			(row) => row.n > 0 && seen.has(row.v),
-		);
+		if (!wares || !marks) return broken ? [] : stocked;
+		if (!scores && broken) return [];
+		const listed = tables.stock(wares, marks, off, years, picked, land, score);
 		const floor = above.has("venues")
 			? mean(listed, (row) => row.n)
 			: Number.NEGATIVE_INFINITY;
-		stocked = rank(
+		stocked = tables.rank(
 			listed.filter((row) => row.n > floor),
 			s.by === "score"
 				? (row) => row.score ?? Number.NEGATIVE_INFINITY
 				: (row) => row.n,
-			(a, b) => venues.name[a.v].localeCompare(venues.name[b.v]),
+			(a, b) => tables.collate(venues.name[a.v], venues.name[b.v]),
 		);
 		return stocked;
 	});
 
 	const yields = $derived.by(() => {
 		if (seat < 0 || !cells) return undefined;
-		return take(`venue ${seat} ${stays}`, () => bundle(seat, stays));
+		return take(`venue/${seat}. ${stays}`, () => bundle(seat, stays));
 	});
 
 	const firms = $derived.by(() => {
 		if (!yields) return [];
-		const sums = count(
-			[[], []],
-			[{ sign: 1, files: yields }],
-			under,
-			off,
-			institutions.id.length,
-		);
-		const rows: { i: number; n: number; rank: number }[] = [];
-		sums.forEach((n, i) => {
-			if (n > 0 && land(institutions.country[i])) rows.push({ i, n, rank: 0 });
-		});
-		return rank(
-			rows,
-			(row) => row.n,
-			(a, b) => institutions.name[a.i].localeCompare(institutions.name[b.i]),
-		);
+		return tables.firms(meta, yields, under, off, land);
 	});
 
 	let throng = $derived.by(() => {
@@ -654,12 +517,39 @@
 	});
 
 	const busy = $derived(
-		!ready ||
-			(host >= 0 && (!crew || !roster || known < edge)) ||
-			(s.tab === "venues"
-				? seat >= 0 && !yields
-				: s.author !== undefined && pick < 0),
+		!broken &&
+			(!ready ||
+				(host >= 0 && (!crew || !roster || known < edge)) ||
+				(s.tab === "venues"
+					? seat >= 0 && !yields
+					: s.author !== undefined && pick < 0)),
 	);
+
+	const used = $derived.by(() => {
+		const files = new Set<string>();
+		for (const key of flips) {
+			const cell = shelf.mass.get(key);
+			if (cell) files.add(`venue/${cell[1]}.`);
+		}
+		if (seat >= 0) files.add(`venue/${seat}.`);
+		for (const i of [open, nested]) if (i >= 0) files.add(`institution/${i}.`);
+		return files;
+	});
+
+	$effect(() => {
+		const files = used;
+		if (host < 0) void staff;
+		if (seat < 0) void firms;
+		untrack(() => {
+			const gone = [...kept].filter((file) => !files.has(file));
+			kept = files;
+			if (!gone.length) return;
+			for (const file of gone) drop(file);
+			got = new Map(
+				[...got].filter(([key]) => !gone.some((file) => key.startsWith(file))),
+			);
+		});
+	});
 
 	const mark = (t: number) => {
 		const all = shelf.listings[t - 1];
@@ -773,7 +663,10 @@
 	let heaped = { by: new Map<number, number>(), sum: [0, 0, 0, 0, 0] };
 
 	const heaps = $derived.by(() => {
-		if (!wares) return heaped;
+		if (!wares)
+			return broken
+				? { by: new Map<number, number>(), sum: [0, 0, 0, 0, 0] }
+				: heaped;
 		const by = new Map<number, number>();
 		const sum = [0, 0, 0, 0, 0];
 		for (const { child, v, tier: t, mass } of wares)
@@ -833,17 +726,9 @@
 	let weighed = { by: new Map<string, number>(), sum: 0 };
 
 	const weights = $derived.by(() => {
-		if (!sums) return weighed;
-		const known = new Set(lands);
-		const by = new Map<string, number>();
-		let sum = 0;
-		sums.forEach((n, i) => {
-			const code = institutions.country[i];
-			if (n <= 0 || !known.has(code)) return;
-			by.set(code, (by.get(code) ?? 0) + n);
-			sum += n;
-		});
-		weighed = { by, sum };
+		if (!sums)
+			return broken ? { by: new Map<string, number>(), sum: 0 } : weighed;
+		weighed = tables.shares(meta, sums);
 		return weighed;
 	});
 
@@ -868,7 +753,7 @@
 							code,
 							children: [] as Twig[],
 						}))
-						.sort((a, b) => a.name.localeCompare(b.name)),
+						.sort((a, b) => tables.collate(a.name, b.name)),
 				}))
 				.filter((continent) => continent.children.length),
 		}),
@@ -892,10 +777,6 @@
 	let shown = $derived.by(() => {
 		void base;
 		void s.tab;
-		void s.sort;
-		void s.by;
-		void s.at;
-		void s.above;
 		return ssr?.rows ?? 64;
 	});
 
@@ -925,8 +806,31 @@
 		return n < 0 ? `\u2212${text}` : `\u2007${text}`;
 	};
 
-	const ratio = (row: Row) =>
+	const ratio = (row: tables.Row) =>
 		row.people ? hundredths(row.count * years.length, row.people) : "0.00";
+
+	const voice = (rank: number, name: string, figures: [string, string][]) =>
+		ssr
+			? undefined
+			: [
+					`${rank} ${name}`,
+					...figures.filter(([, value]) => value).map((pair) => pair.join(" ")),
+				].join(", ");
+
+	const said = (row: tables.Row) =>
+		voice(row.rank, row.name, [
+			["Count", micro(row.count)],
+			["Authors", micro(row.authors)],
+			["Per author", row.authors ? ratio(row) : ""],
+			["Excess", signed(row.excess)],
+		]);
+
+	const told = (row: tables.Stock) =>
+		voice(row.rank, venues.name[row.v], [
+			["Tier", row.tiers.join(" ").trim()],
+			["Score", four(row.score)],
+			["Count", micro(row.n)],
+		]);
 
 	const backs: Partial<Record<Tab, number>> = {};
 
@@ -1095,7 +999,8 @@
 	});
 
 	$effect(() => {
-		if (s.tab === "about" ? lazy : ready) onready?.();
+		if (broken) onfail?.();
+		else if (s.tab === "about" ? lazy : ready) onready?.();
 	});
 
 	const csv = () => {
@@ -1134,25 +1039,25 @@
 							micro(row.n),
 						]),
 					];
-		const file = new Blob(
-			[`${lines.map((line) => line.map(cell).join(",")).join("\n")}\n`],
-			{ type: "text/csv" },
+		save(
+			new Blob(
+				[`\ufeff${lines.map((line) => line.map(cell).join(",")).join("\n")}\n`],
+				{ type: "text/csv" },
+			),
+			`allrankings-${node.level}-${node.id}-${s.tab}-${range}.csv`,
 		);
-		const anchor = document.createElement("a");
-		anchor.href = URL.createObjectURL(file);
-		anchor.download = `allrankings-${node.level}-${node.id}-${s.tab}-${range}.csv`;
-		anchor.click();
-		URL.revokeObjectURL(anchor.href);
 	};
 
 	let making = $state(false);
 
+	const blank = $derived(ready && !table.length);
+
 	const poster = async () => {
-		if (making) return;
+		if (making || blank) return;
 		making = true;
 		try {
 			const { make } = await import("./poster/make");
-			await make(s, api, flag);
+			await make(selection(s), api, flag, save);
 		} catch (error) {
 			console.error(error);
 		}
@@ -1160,7 +1065,12 @@
 	};
 </script>
 
-<svelte:window onpopstate={() => (s = read())} />
+<svelte:window
+	onpopstate={() => {
+		s = read();
+		placed = where(s);
+	}}
+/>
 
 {#snippet tab(key: Tab, label: string)}
 	<a
@@ -1217,7 +1127,7 @@
 	>
 {/snippet}
 
-{#snippet venue(row: Stock)}
+{#snippet venue(row: tables.Stock)}
 	<span class="rank">{row.rank}</span>
 	<span class="entry">
 		{@render name(venues.country[row.v], venues.name[row.v])}
@@ -1254,7 +1164,7 @@
 	>
 {/snippet}
 
-{#snippet line(row: Row)}
+{#snippet line(row: tables.Row)}
 	<span class="rank">{row.rank}</span>
 	{@render name(institutions.country[row.i], row.name)}
 	<span class="num">{micro(row.count)}</span>
@@ -1285,7 +1195,7 @@
 				>
 			{:else}
 				<button
-					aria-disabled={making}
+					aria-disabled={making || blank}
 					aria-busy={making}
 					title="Download poster"
 					aria-label="Download poster"
@@ -1341,13 +1251,13 @@
 		{#snippet tail()}
 			<span class="years">
 				<select bind:value={s.from} aria-label="From">
-					{#each span(bounds[0], s.to) as year (year)}
+					{#each tables.span(bounds[0], s.to) as year (year)}
 						<option value={year}>{year}</option>
 					{/each}
 				</select>
 				–
 				<select bind:value={s.to} aria-label="To">
-					{#each span(s.from, bounds[1]) as year (year)}
+					{#each tables.span(s.from, bounds[1]) as year (year)}
 						<option value={year}>{year}</option>
 					{/each}
 				</select>
@@ -1357,6 +1267,7 @@
 
 	<main
 		class={[s.tab, { busy }]}
+		aria-busy={busy}
 		style:--years={years.length}
 		style:--digits={String(size).length}
 		style:--w1={widths[0]}
@@ -1401,6 +1312,7 @@
 						<button
 							class="row open"
 							aria-expanded="true"
+							aria-label={said(row)}
 							onclick={(event) => expand(event, row.i)}
 							>{@render line(row)}</button
 						>
@@ -1444,6 +1356,7 @@
 					<button
 						class="row"
 						aria-expanded="false"
+						aria-label={said(row)}
 						onclick={(event) => expand(event, row.i)}
 						>{@render line(row)}</button
 					>
@@ -1456,6 +1369,7 @@
 						<button
 							class="row open"
 							aria-expanded="true"
+							aria-label={told(row)}
 							onclick={(event) => unfold(event, row.v)}
 							>{@render venue(row)}</button
 						>
@@ -1464,6 +1378,9 @@
 							<button
 								class={["row sub", { lit }]}
 								aria-expanded={lit}
+								aria-label={voice(firm.rank, institutions.name[firm.i], [
+									["Count", micro(firm.n)],
+								])}
 								onclick={(event) =>
 									nest(
 										event,
@@ -1508,6 +1425,7 @@
 					<button
 						class="row"
 						aria-expanded="false"
+						aria-label={told(row)}
 						onclick={(event) => unfold(event, row.v)}
 						>{@render venue(row)}</button
 					>

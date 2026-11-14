@@ -1,5 +1,7 @@
 import type { Item } from "./scene";
 
+type Text = Extract<Item, { kind: "text" }>;
+
 const quote = (value: unknown, attr: boolean) => {
 	const text = String(value ?? "");
 	const pattern = attr ? /[&"<]/g : /[&<]/g;
@@ -23,7 +25,12 @@ const n = (v: number) => v.toFixed(1);
 
 export const frame = "#a9afb8";
 
-const draw = (list: Item[], flags: Map<string, string>, out: string[]) => {
+const draw = (
+	list: Item[],
+	flags: Map<string, string>,
+	out: string[],
+	family: (item: Text) => string,
+) => {
 	for (const item of list) {
 		if (item.kind === "rect")
 			out.push(
@@ -36,7 +43,7 @@ const draw = (list: Item[], flags: Map<string, string>, out: string[]) => {
 					item.rotate
 						? `rotate(${item.rotate} ${item.x} ${item.y})`
 						: undefined,
-				)}${at("font-family", item.family)}${at("font-size", item.size)}${at("font-weight", item.weight)}${at("fill", item.fill)}${at(
+				)}${at("font-family", family(item))}${at("font-size", item.size)}${at("font-weight", item.weight)}${at("fill", item.fill)}${at(
 					"text-anchor",
 					item.anchor === "start" ? undefined : item.anchor,
 				)}${at("letter-spacing", item.track || undefined)}${at(
@@ -71,14 +78,19 @@ const draw = (list: Item[], flags: Map<string, string>, out: string[]) => {
 				);
 		} else if (item.kind === "link") {
 			out.push(`<a${at("href", item.href)}>`);
-			draw(item.items, flags, out);
+			draw(item.items, flags, out, family);
 			out.push("</a>");
 		}
 	}
 };
 
-export const face = (family: string, weight: number, base64: string) =>
-	`@font-face{font-family:'${family}';font-weight:${weight};font-style:normal;src:url(data:font/otf;base64,${base64}) format('opentype')}`;
+export const face = (
+	family: string,
+	weight: number,
+	base64: string,
+	type = "otf",
+) =>
+	`@font-face{font-family:'${family}';font-weight:${weight};font-style:normal;src:url(data:font/${type};base64,${base64}) format('${type === "otf" ? "opentype" : "truetype"}')}`;
 
 export const svg = (
 	items: Item[],
@@ -87,6 +99,7 @@ export const svg = (
 	flags: Map<string, string>,
 	faces: string[],
 	top = 0,
+	family = (item: Text) => item.family,
 ) => {
 	const out = [
 		`<?xml version="1.0" encoding="UTF-8"?>\n<svg xmlns="http://www.w3.org/2000/svg"${at("width", width)}${at("height", height)} viewBox="0 ${top} ${quote(width, true)} ${quote(height, true)}"><defs><style>${faces.join("")}</style>`,
@@ -96,7 +109,7 @@ export const svg = (
 			`<symbol id="flag-${quote(code, true)}" viewBox="0 0 640 480" preserveAspectRatio="none"><image width="640" height="480"${at("href", uri)} preserveAspectRatio="none"></image></symbol>`,
 		);
 	out.push("</defs>");
-	draw(items, flags, out);
+	draw(items, flags, out, family);
 	out.push("</svg>\n");
 	return out.join("");
 };

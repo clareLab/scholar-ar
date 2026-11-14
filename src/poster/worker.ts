@@ -1,10 +1,11 @@
 import { load } from "../data";
 import { flag } from "../flags";
+import type { Selection } from "../state";
 import type { Flag } from "./band";
 import { build } from "./build";
 import { page } from "./compose";
-import { poster, type Selection } from "./data";
-import { stamp } from "./masthead";
+import { poster } from "./data";
+import { heading, stamp } from "./masthead";
 import { pdf, type Raster } from "./pdf";
 import { png } from "./png";
 import { zip } from "./zip";
@@ -45,6 +46,15 @@ const fetched = async (url: string) => {
 	return response.arrayBuffer();
 };
 
+const now = (url: string) => {
+	const request = new XMLHttpRequest();
+	request.open("GET", url, false);
+	request.responseType = "arraybuffer";
+	request.send();
+	if (request.status !== 200) throw new Error(`${request.status} ${url}`);
+	return request.response as ArrayBuffer;
+};
+
 const make = async ({ selection, date, snapshot, release }: Ask) => {
 	const meta = await load();
 	const data = await poster(meta, selection);
@@ -56,6 +66,7 @@ const make = async ({ selection, date, snapshot, release }: Ask) => {
 			const url = flag(code.toUpperCase());
 			return url ? fetched(url) : undefined;
 		},
+		(file) => now(`${import.meta.env.BASE_URL}fonts/${file}`),
 	);
 	const slices = bands(512, 8192).map((band) => ({
 		...band,
@@ -72,7 +83,7 @@ const make = async ({ selection, date, snapshot, release }: Ask) => {
 	const flags = new Map("flags" in first ? first.flags : []);
 	const [vector, raster] = await Promise.all([
 		pdf(scene.items, page.width, page.height, fonts, flags, {
-			title: data.view.level === "all" ? "AllRankings" : data.view.name,
+			title: heading(data),
 			author: "clareLab",
 		}),
 		png(

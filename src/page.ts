@@ -1,13 +1,8 @@
 import lead from "./about/about.md?lead";
 import { sentence } from "./about/sentence";
-import { type Lang, langs } from "./about/words";
-import { type Node, years } from "./data";
-
-export const origin = "https://ar.clarelab.moe";
-
-export type Tab = "institutions" | "venues" | "about";
-
-export type Place = { tab: Tab; view: number; lang: Lang };
+import type { Lang } from "./about/words";
+import type { Node } from "./data";
+import { origin, years } from "./state";
 
 export type Head = {
 	lang: string;
@@ -27,22 +22,6 @@ export type Ssr = {
 };
 
 const labels = { institutions: "Institutions", venues: "Venues" };
-
-export const parse = (raw: string, nodes: Map<number, Node>) => {
-	const path = raw.replace(/\/+/g, "/").replace(/\/index\.html$/, "/");
-	const view = path.match(/^\/(?:([1-9]\d*)\/)?(institutions|venues)\/?$/);
-	if (view) {
-		const id = Number(view[1] ?? 0);
-		if (id && !nodes.has(id)) return undefined;
-		return { tab: view[2] as Tab, view: id, lang: "en" } as Place;
-	}
-	const about = path.match(/^\/(\w+)\/about\/?$/);
-	const lang = langs.find((key) => key === about?.[1]);
-	return lang ? ({ tab: "about", view: 0, lang } as Place) : undefined;
-};
-
-export const where = ({ tab, view, lang }: Place) =>
-	tab === "about" ? `/${lang}/about/` : `/${view ? `${view}/` : ""}${tab}/`;
 
 const up = (path: string, nodes: Map<number, Node>) => {
 	const parts = path.split("/").filter(Boolean);
@@ -76,6 +55,14 @@ export const plain = (event: MouseEvent) =>
 	!event.ctrlKey &&
 	!event.shiftKey &&
 	!event.altKey;
+
+export const save = (blob: Blob, name: string) => {
+	const anchor = document.createElement("a");
+	anchor.href = URL.createObjectURL(blob);
+	anchor.download = name;
+	anchor.click();
+	setTimeout(() => URL.revokeObjectURL(anchor.href), 65536);
+};
 
 const length = (text: string) => [...text].length;
 

@@ -1,4 +1,5 @@
 import { fontOf, measure } from "./fonts";
+import { supplied } from "./noto";
 import type { Item } from "./scene";
 
 const margin = 16;
@@ -90,8 +91,11 @@ export const used = (
 ) => {
 	for (const item of items) {
 		if (item.kind === "flag") flags.push(item);
-		else if (item.kind === "text") faces.add(`${item.family}${item.weight}`);
-		else if (item.kind === "link") used(item.items, flags, faces);
+		else if (item.kind === "text") {
+			faces.add(`${item.family}${item.weight}`);
+			for (const name of supplied(item.text, fontOf(item.family, item.weight)))
+				faces.add(`${name}${item.weight}`);
+		} else if (item.kind === "link") used(item.items, flags, faces);
 	}
 	return { flags, faces };
 };

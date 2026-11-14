@@ -1,6 +1,16 @@
+import { mirror } from "./bidi";
 import { type Face, type Font, face, files, fontOf } from "./fonts";
+import {
+	characters,
+	lay,
+	type Piece,
+	type Shape,
+	subset,
+	type Weighted,
+} from "./noto";
 import type { Item } from "./scene";
 import { frame } from "./svg";
+import { crc32 } from "./zip";
 
 export type Raster = { width: number; height: number; rgba: Uint8ClampedArray };
 
@@ -269,6 +279,18 @@ const utf16 = (text: string) => {
 const literal = (text: string) =>
 	`(${text.replace(/[\\()]/g, (c) => `\\${c}`)})`;
 
+const cmap = (glyphs: number[], map: Map<number, string>) => {
+	const entries = glyphs.map(
+		(g) => `<${hex4(g)}> <${utf16(map.get(g) as string)}>`,
+	);
+	const blocks: string[] = [];
+	for (let k = 0; k < entries.length; k += 100) {
+		const part = entries.slice(k, k + 100);
+		blocks.push(`${part.length} beginbfchar\n${part.join("\n")}\nendbfchar`);
+	}
+	return `/CIDInit /ProcSet findresource begin\n12 dict begin\nbegincmap\n/CIDSystemInfo << /Registry (Adobe) /Ordering (UCS) /Supplement 0 >> def\n/CMapName /Adobe-Identity-UCS def\n/CMapType 2 def\n1 begincodespacerange\n<0000> <FFFF>\nendcodespacerange\n${blocks.join("\n")}\nendcmap\nCMapName currentdict /CMap defineresource pop\nend\nend\n`;
+};
+
 const kappa = 0.5522847498307936;
 
 const deflate = async (data: Uint8Array) =>
@@ -292,6 +314,16 @@ export const pdf = async (
 	const used = new Map<
 		string,
 		{ id: string; s: Shaper; text: Map<number, string>; font: Font }
+	>();
+	const notos = new Map<
+		string,
+		{
+			id: string;
+			noto: Weighted;
+			text: Map<number, string>;
+			glyphs: Set<number>;
+			codes: Set<number>;
+		}
 	>();
 	const alphas = new Map<number, string>();
 	const images = new Map<string, string>();
@@ -356,7 +388,173 @@ export const pdf = async (
 			(units / f.s.face.em) * item.size + item.track * shaped.glyphs.length;
 		return { f, shaped, w };
 	};
+	const mixed = (item: Text, pieces: Piece[], bounds?: number[]) => {
+		const parts = pieces.map((piece) => {
+			if (!piece.noto || !piece.shape) {
+				const f = typeface(item);
+				const shaped = shape(f.s, piece.text, !item.track);
+				let units = 0;
+				shaped.glyphs.forEach((g, k) => {
+					units += f.s.face.width(g) + shaped.kerns[k];
+				});
+				const w =
+					(units / f.s.face.em) * item.size + item.track * shaped.glyphs.length;
+				return { piece, f, shaped, w };
+			}
+			let n = notos.get(piece.noto.file);
+			if (!n) {
+				n = {
+					id: `N${notos.size}`,
+					noto: piece.noto,
+					text: new Map(),
+					glyphs: new Set(),
+					codes: new Set(),
+				};
+				notos.set(piece.noto.file, n);
+			}
+			characters(piece, n.codes);
+			const w =
+				(piece.shape.width / piece.noto.face.em) * item.size +
+				item.track * piece.shape.glyphs.length;
+			return { piece, n, w };
+		});
+		const total = parts.reduce((a, p) => a + p.w, 0);
+		const shift =
+			item.anchor === "end"
+				? -total
+				: item.anchor === "middle"
+					? -total / 2
+					: 0;
+		const angle = ((item.rotate ?? 0) * Math.PI) / 180;
+		const cos = Math.cos(angle);
+		const sin = Math.sin(angle);
+		const x = item.x + cos * shift;
+		const y = item.y + sin * shift;
+		const at = (u: number, v: number) =>
+			`${num(cos)} ${num(sin)} ${num(sin)} ${num(-cos)} ${num(x + cos * u + sin * v)} ${num(y + sin * u - cos * v)} Tm`;
+		const rtl = pieces.some((piece) => piece.rtl);
+		const body: string[] = [];
+		const halo: string[] = [];
+		const later: string[] = [];
+		const push = (show: string, logical?: string) => {
+			halo.push(show);
+			body.push(
+				logical === undefined
+					? show
+					: `/Span << /ActualText <FEFF${utf16(logical)}> >> BDC ${show} EMC`,
+			);
+		};
+		let pen = 0;
+		for (const part of parts) {
+			if ("f" in part && part.f) {
+				const { f, shaped, piece } = part;
+				const head = `/${f.id} ${num(item.size)} Tf ${num(item.track)} Tc`;
+				if (piece.rtl) {
+					push(head);
+					const scale = item.size / f.s.face.em;
+					let advance = 0;
+					shaped.glyphs.forEach((g, k) => {
+						const code = shaped.codes[k];
+						if (!f.text.has(g)) f.text.set(g, code);
+						const logical = [...code]
+							.map((c) =>
+								String.fromCodePoint(mirror(c.codePointAt(0) as number)),
+							)
+							.join("");
+						push(
+							`${at(pen + advance * scale, 0)} <${hex4(g)}> Tj`,
+							logical === code ? undefined : logical,
+						);
+						advance += f.s.face.width(g) + shaped.kerns[k] + item.track / scale;
+					});
+				} else {
+					const runs: string[] = [];
+					let run = "";
+					shaped.glyphs.forEach((g, k) => {
+						run += hex4(g);
+						if (!f.text.has(g)) f.text.set(g, shaped.codes[k]);
+						const adjust = shaped.kerns[k];
+						if (adjust && k + 1 < shaped.glyphs.length) {
+							runs.push(`<${run}>`, num((-adjust * 1000) / f.s.face.em));
+							run = "";
+						}
+					});
+					if (run) runs.push(`<${run}>`);
+					push(`${head} ${at(pen, 0)} [${runs.join(" ")}] TJ`);
+				}
+			} else if ("n" in part && part.n) {
+				const { n, piece } = part;
+				const s = piece.shape as Shape;
+				const scale = item.size / n.noto.face.em;
+				const head = `/${n.id} ${num(item.size)} Tf ${num(item.track)} Tc`;
+				const shows: string[] = [];
+				let advance = 0;
+				s.glyphs.forEach((g, k) => {
+					n.glyphs.add(g);
+					shows.push(
+						`${at(pen + (advance + s.dx[k]) * scale, s.dy[k] * scale)} <${hex4(g)}> Tj`,
+					);
+					advance += s.advances[k] + item.track / scale;
+				});
+				const starts = [...new Set(s.clusters)].sort((a, b) => a - b);
+				const members = new Map<number, number[]>();
+				s.clusters.forEach((c, k) => {
+					const list = members.get(c);
+					if (list) list.push(k);
+					else members.set(c, [k]);
+				});
+				halo.push(head, ...shows);
+				if (!rtl) body.push(head, ...shows);
+				for (const [c, list] of members) {
+					const base = list.reduce(
+						(b, k) => (s.advances[k] > s.advances[b] ? k : b),
+						list[0],
+					);
+					const next = starts.find((v) => v > c) ?? piece.text.length;
+					const cluster = piece.text.slice(c, next);
+					const said = piece.rtl ? [...cluster].reverse().join("") : cluster;
+					if (!n.text.has(s.glyphs[base])) n.text.set(s.glyphs[base], said);
+					if (!rtl) continue;
+					body.push(
+						`${head} /Span << /ActualText <FEFF${utf16(said)}> >> BDC ${shows[base]} EMC`,
+					);
+					for (const k of list)
+						if (k !== base) later.push(`${head} ${shows[k]}`);
+				}
+			}
+			pen += part.w;
+		}
+		alpha(1);
+		if (item.halo) {
+			stroke("#ffffff");
+			lineWidth(item.halo);
+			join(1);
+			ops.push(
+				`/Artifact BMC /Span << /ActualText <FEFF> >> BDC BT 1 Tr ${halo.join(" ")} ET EMC EMC`,
+			);
+		}
+		fill(item.fill);
+		if (later.length)
+			body.push(
+				`/Artifact BMC /Span << /ActualText <FEFF> >> BDC ${later.join(" ")} EMC EMC`,
+			);
+		ops.push(
+			rtl
+				? `BT 0 Tr ${body.join(" ")} ET`
+				: `/Span << /ActualText <FEFF${utf16(item.text)}> >> BDC BT 0 Tr ${body.join(" ")} ET EMC`,
+		);
+		if (bounds) {
+			const top = item.size * 0.8;
+			const bottom = item.size * 0.25;
+			bounds.push(x, y - top, x + total, y + bottom);
+		}
+	};
 	const text = (item: Text, bounds?: number[]) => {
+		const pieces = lay(item.text, fontOf(item.family, item.weight));
+		if (pieces) {
+			mixed(item, pieces, bounds);
+			return;
+		}
 		const { f, shaped, w } = measure(item);
 		const shift =
 			item.anchor === "end" ? -w : item.anchor === "middle" ? -w / 2 : 0;
@@ -388,7 +586,9 @@ export const pdf = async (
 			stroke("#ffffff");
 			lineWidth(item.halo);
 			join(1);
-			ops.push(`${open}BT 1 Tr ${head} [${runs.join(" ")}] TJ ET${close}`);
+			ops.push(
+				`/Artifact BMC /Span << /ActualText <FEFF> >> BDC BT 1 Tr ${head} [${runs.join(" ")}] TJ ET EMC EMC`,
+			);
 		}
 		fill(item.fill);
 		ops.push(`${open}BT 0 Tr ${head} [${runs.join(" ")}] TJ ET${close}`);
@@ -594,21 +794,64 @@ export const pdf = async (
 					fonts.get(files[`${font.family}${font.weight}`]) as ArrayBuffer,
 				),
 			);
-			const entries = glyphs.map(
-				(g) => `<${hex4(g)}> <${utf16(map.get(g) as string)}>`,
+			await stream(unicode, "", encoder.encode(cmap(glyphs, map)));
+		});
+	}
+	for (const { id, noto, text: map, glyphs: drawn, codes } of notos.values()) {
+		const type0 = reserve();
+		const cid = reserve();
+		const descriptor = reserve();
+		const file = reserve();
+		const unicode = reserve();
+		fontRefs.push(`/${id} ${type0} 0 R`);
+		fontObjects.push(async () => {
+			const f = noto.face;
+			const v = f.view;
+			const head = f.tables.get("head") as number;
+			const hhea = f.tables.get("hhea") as number;
+			const scale = 1000 / f.em;
+			const bbox = [36, 38, 40, 42].map((o) =>
+				Math.round(v.getInt16(head + o) * scale),
 			);
-			const blocks: string[] = [];
-			for (let k = 0; k < entries.length; k += 100) {
-				const part = entries.slice(k, k + 100);
-				blocks.push(
-					`${part.length} beginbfchar\n${part.join("\n")}\nendbfchar`,
+			const glyphs = [...drawn].sort((a, b) => a - b);
+			const program = subset(noto, drawn, codes);
+			const tag = [...crc32(program).toString(26).padStart(6, "0").slice(-6)]
+				.map((c) => String.fromCharCode(65 + Number.parseInt(c, 26)))
+				.join("");
+			const name = `${tag}+${nameOf(f)}`;
+			const widths: string[] = [];
+			for (let k = 0; k < glyphs.length; ) {
+				let j = k;
+				while (j + 1 < glyphs.length && glyphs[j + 1] === glyphs[j] + 1) j++;
+				widths.push(
+					`${glyphs[k]} [${glyphs
+						.slice(k, j + 1)
+						.map((g) => num(f.width(g) * scale))
+						.join(" ")}]`,
 				);
+				k = j + 1;
 			}
+			object(
+				type0,
+				`<< /Type /Font /Subtype /Type0 /BaseFont /${name} /Encoding /Identity-H /DescendantFonts [${cid} 0 R] /ToUnicode ${unicode} 0 R >>`,
+			);
+			object(
+				cid,
+				`<< /Type /Font /Subtype /CIDFontType2 /BaseFont /${name} /CIDSystemInfo << /Registry (Adobe) /Ordering (Identity) /Supplement 0 >> /FontDescriptor ${descriptor} 0 R /DW 1000 /W [${widths.join(" ")}] /CIDToGIDMap /Identity >>`,
+			);
+			object(
+				descriptor,
+				`<< /Type /FontDescriptor /FontName /${name} /Flags 4 /FontBBox [${bbox.join(" ")}] /ItalicAngle 0 /Ascent ${Math.round(v.getInt16(hhea + 4) * scale)} /Descent ${Math.round(v.getInt16(hhea + 6) * scale)} /CapHeight ${Math.round(f.cap * scale)} /StemV ${Math.round(50 + (noto.weight - 400) / 4)} /FontFile2 ${file} 0 R >>`,
+			);
+			await stream(file, `/Length1 ${program.length}`, program);
 			await stream(
 				unicode,
 				"",
 				encoder.encode(
-					`/CIDInit /ProcSet findresource begin\n12 dict begin\nbegincmap\n/CIDSystemInfo << /Registry (Adobe) /Ordering (UCS) /Supplement 0 >> def\n/CMapName /Adobe-Identity-UCS def\n/CMapType 2 def\n1 begincodespacerange\n<0000> <FFFF>\nendcodespacerange\n${blocks.join("\n")}\nendcmap\nCMapName currentdict /CMap defineresource pop\nend\nend\n`,
+					cmap(
+						[...map.keys()].sort((a, b) => a - b),
+						map,
+					),
 				),
 			);
 		});
@@ -673,7 +916,7 @@ export const pdf = async (
 	});
 	object(
 		meta,
-		`<< /Title ${literal(info.title)} /Author ${literal(info.author)} /Producer (AllRankings) >>`,
+		`<< /Title <FEFF${utf16(info.title)}> /Author <FEFF${utf16(info.author)}> /Producer <FEFF${utf16("AllRankings")}> >>`,
 	);
 	const xref = length;
 	const rows = ["0000000000 65535 f "];

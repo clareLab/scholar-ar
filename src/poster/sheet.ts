@@ -1,17 +1,16 @@
 import { cap, type Font, measure } from "./fonts";
-import { scale, snap } from "./format";
 import { grey, ink } from "./palette";
 import type { Scene } from "./scene";
 
 export const sans: Font = { family: "sans", weight: 400 };
 export const sansMedium: Font = { family: "sans", weight: 500 };
 export const sansSemi: Font = { family: "sans", weight: 600 };
+export const sansBold: Font = { family: "sans", weight: 700 };
 export const cond: Font = { family: "cond", weight: 400 };
 export const condMedium: Font = { family: "cond", weight: 500 };
 export const condSemi: Font = { family: "cond", weight: 600 };
 
 export const titleSize = 40;
-export const titleFont: Font = { family: "sans", weight: 600 };
 export const titleBand = 112;
 
 export type Row = {
@@ -62,7 +61,7 @@ export const flow = (rows: Row[], room: number) => {
 export const pack = (rows: Row[], n: number) => {
 	const total = rows.reduce((a, r) => a + r.height, 0);
 	let lo = Math.max(0, Math.floor(total / n) - 1);
-	let hi = Math.max(total, 1);
+	let hi = Math.max(Math.ceil(total), 1);
 	while (hi - lo > 1) {
 		const mid = Math.floor((lo + hi) / 2);
 		if (flow(rows, mid).length <= n) hi = mid;
@@ -79,13 +78,13 @@ export const blockTitle = (
 	text: string,
 	note: string,
 ) => {
-	const base = y + cap(titleSize, titleFont);
+	const base = y + cap(titleSize, sansSemi);
 	scene.text(
 		x,
 		base,
 		text,
 		titleSize,
-		titleFont,
+		sansSemi,
 		ink,
 		"start",
 		0,
@@ -109,10 +108,14 @@ export const divider = (
 	scene.text(x + w, mid + cap(s, sansSemi) / 2, text, s, sansSemi, ink, "end");
 };
 
+export const minOf = (values: number[]) =>
+	values.reduce((a, v) => Math.min(a, v), Number.POSITIVE_INFINITY);
+
+export const maxOf = (values: number[]) =>
+	values.reduce((a, v) => Math.max(a, v), Number.NEGATIVE_INFINITY);
+
+export const radius = (most: number) => (n: number) =>
+	Math.max(2, 64 * Math.sqrt(n / most));
+
 export const percentOf = (k: number) =>
 	["50%", "75%", "87.5%", "93.75%"][k - 1];
-
-export const step = (s: number, k: number) => {
-	const i = scale.indexOf(snap(s));
-	return scale[Math.min(scale.length - 1, Math.max(0, i + k))];
-};

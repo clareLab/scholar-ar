@@ -161,13 +161,15 @@ h1 {
   vertical-align: -0.15em;
 }
 
-.icons [aria-busy="true"] {
-  cursor: progress;
-  animation: pulse 1.2s ease-in-out infinite alternate;
-}
-
+.icons button:disabled,
 .icons button[aria-disabled="true"] {
   color: var(--mute);
+  cursor: default;
+}
+
+.icons button[aria-busy="true"] {
+  cursor: progress;
+  animation: pulse 1.2s ease-in-out infinite alternate;
 }
 
 @keyframes pulse {

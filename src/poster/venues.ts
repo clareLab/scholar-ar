@@ -9,6 +9,7 @@ import {
 	condSemi,
 	divider,
 	type Grid,
+	maxOf,
 	pack,
 	percentOf,
 	type Row,
@@ -57,9 +58,14 @@ const cellLabel = (rank: string, name: string, w: number, h: number) => {
 	return undefined;
 };
 
-export const venueParts = (data: Data, derived: Derived, s: number) => {
+export const venueParts = (
+	data: Data,
+	derived: Derived,
+	s: number,
+	most = derived.venueCut.end,
+) => {
 	const gap = Math.round(s * 0.6);
-	const rows = data.venues.slice(0, derived.venueCut.end);
+	const rows = data.venues.slice(0, most);
 	const half = derived.venueCut.marks.find((m) => m.k === 1)?.row ?? 0;
 	const chosen = new Set(data.selection.years);
 	const history = data.history;
@@ -80,8 +86,10 @@ export const venueParts = (data: Data, derived: Derived, s: number) => {
 	const flagW = Math.round(s * 1.2);
 	const countW = Math.max(
 		measure("Count", hs, sansMedium),
-		...rows.map((r, i) =>
-			measure(fixed(r.count), s, i < half ? sansMedium : sans),
+		maxOf(
+			rows.map((r, i) =>
+				measure(fixed(r.count), s, i < half ? sansMedium : sans),
+			),
 		),
 	);
 	const nameX = rankW + gap + flagW + gap * 0.6;
@@ -114,8 +122,9 @@ export const venuesBlock = (
 	s: number,
 	grid: Grid,
 	first = 0,
+	most = derived.venueCut.end,
 ): Sheet | undefined => {
-	const parts = venueParts(data, derived, s);
+	const parts = venueParts(data, derived, s, most);
 	const {
 		gap,
 		rows,
@@ -260,7 +269,7 @@ export const venuesBlock = (
 			const sy = y + titleBand;
 			const total = derived.mass || 1;
 			let run = 0;
-			for (const v of rows) {
+			for (const v of data.venues.slice(0, derived.venueCut.end)) {
 				const sx = x + (run / total) * full;
 				const w = (v.count / total) * full;
 				const ti = latest(v);

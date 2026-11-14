@@ -5,7 +5,6 @@ export type Font = { family: Family; weight: Weight };
 export type Face = {
 	em: number;
 	cap: number;
-	x: number;
 	view: DataView;
 	tables: Map<string, number>;
 	glyphs: Map<number, number>;
@@ -16,7 +15,7 @@ export type Face = {
 const faces = new Map<string, Face>();
 const key = (font: Font) => `${font.family}${font.weight}`;
 
-const parse = (bytes: ArrayBuffer): Face => {
+export const parse = (bytes: ArrayBuffer): Face => {
 	const view = new DataView(bytes);
 	const tables = new Map<string, number>();
 	const count = view.getUint16(4);
@@ -75,7 +74,6 @@ const parse = (bytes: ArrayBuffer): Face => {
 	return {
 		em,
 		cap: view.getInt16(os2 + 88),
-		x: view.getInt16(os2 + 86),
 		view,
 		tables,
 		glyphs,
@@ -142,9 +140,15 @@ export const cap = (size: number, font: Font) => {
 	return (m.cap / m.em) * size;
 };
 
-export const xheight = (size: number, font: Font) => {
-	const m = metrics(font);
-	return (m.x / m.em) * size;
+type Extension = {
+	covers: (code: number) => boolean;
+	width: (text: string, size: number, font: Font, track: number) => number;
+};
+
+let extension: Extension | undefined;
+
+export const extend = (more: Extension) => {
+	extension = more;
 };
 
 export const measure = (text: string, size: number, font: Font, track = 0) => {
@@ -152,7 +156,10 @@ export const measure = (text: string, size: number, font: Font, track = 0) => {
 	let units = 0;
 	let glyphs = 0;
 	for (const char of text) {
-		units += m.advance(char.codePointAt(0) as number);
+		const code = char.codePointAt(0) as number;
+		if (extension && !m.glyphs.has(code) && extension.covers(code))
+			return extension.width(text, size, font, track);
+		units += m.advance(code);
 		glyphs++;
 	}
 	return (units / m.em) * size + track * glyphs;

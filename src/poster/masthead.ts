@@ -1,9 +1,10 @@
 import { balance, cap, type Font, measure } from "./fonts";
-import { list, plural, titled, whole } from "./format";
+import { list, plural, plurals, titled, whole } from "./format";
 import type { Data } from "./model";
 import { grey, ink, link } from "./palette";
 import { qr } from "./qr";
 import type { Scene } from "./scene";
+import { maxOf, sans, sansBold, sansMedium } from "./sheet";
 
 export type Meta = { label: string; value: string; link?: boolean }[];
 
@@ -18,10 +19,6 @@ export const stamp = (
 	{ label: "Data", value: `OpenAlex, ${snapshot}` },
 	{ label: "Release", value: release },
 ];
-
-const bold: Font = { family: "sans", weight: 700 };
-const medium: Font = { family: "sans", weight: 500 };
-const regular: Font = { family: "sans", weight: 400 };
 
 export const brand = "AllRankings";
 
@@ -45,7 +42,7 @@ export const selection = (data: Data) => {
 	const child = data.levels.child;
 	if (child) {
 		const checked = data.children.length + data.zero.length;
-		const noun = plural(data.levels.total, child, `${child}s`);
+		const noun = plural(data.levels.total, child, plurals(child));
 		parts.push([
 			checked < data.levels.total
 				? `${whole(checked)} of ${noun}`
@@ -68,12 +65,21 @@ export const selection = (data: Data) => {
 	);
 };
 
-const fill = (words: string[], size: number, font: Font, room: number) => {
+const fill = (
+	words: string[],
+	size: number,
+	font: Font,
+	room: number,
+	gap = " ",
+) => {
 	const lines: string[] = [];
 	for (const word of words) {
 		const last = lines[lines.length - 1];
-		if (last !== undefined && measure(`${last} ${word}`, size, font) <= room)
-			lines[lines.length - 1] = `${last} ${word}`;
+		if (
+			last !== undefined &&
+			measure(`${last}${gap}${word}`, size, font) <= room
+		)
+			lines[lines.length - 1] = `${last}${gap}${word}`;
 		else lines.push(word);
 	}
 	return lines;
@@ -88,6 +94,9 @@ export const totals = (data: Data) => {
 		plural(kpi.venues, `${tiers} venue`, `${tiers} venues`),
 	].join(", ");
 };
+
+export const heading = (data: Data) =>
+	data.view.level === "all" ? brand : titled(data.view.name);
 
 export type Masthead = {
 	width: number;
@@ -108,35 +117,41 @@ type Piece = {
 const markSize = 128;
 
 const pathLine = (data: Data, room: number) => {
-	const head = measure(brand, markSize, bold, -2);
+	const head = measure(brand, markSize, sansBold, -2);
 	const sizes = [128, 112, 96, 80, 64, 56, 48, 40];
 	const widthAt = (size: number) =>
 		head +
 		data.view.trail.reduce(
 			(a, parent) =>
 				a +
-				2 * measure(" ", size, medium) +
-				measure("/", size, medium) +
-				measure(parent, size, medium),
+				2 * measure(" ", size, sansMedium) +
+				measure("/", size, sansMedium) +
+				measure(parent, size, sansMedium),
 			0,
 		);
 	const size = sizes.find((v) => widthAt(v) <= room) ?? sizes[sizes.length - 1];
 	const pieces: Piece[] = [
-		{ text: brand, font: bold, fill: ink, size: markSize, x: 0, track: -2 },
+		{ text: brand, font: sansBold, fill: ink, size: markSize, x: 0, track: -2 },
 	];
-	const space = measure(" ", size, medium);
-	const slash = measure("/", size, medium);
+	const space = measure(" ", size, sansMedium);
+	const slash = measure("/", size, sansMedium);
 	let used = head;
 	for (const parent of data.view.trail) {
-		pieces.push({ text: "/", font: medium, fill: grey, size, x: used + space });
+		pieces.push({
+			text: "/",
+			font: sansMedium,
+			fill: grey,
+			size,
+			x: used + space,
+		});
 		pieces.push({
 			text: parent,
-			font: medium,
+			font: sansMedium,
 			fill: grey,
 			size,
 			x: used + 2 * space + slash,
 		});
-		used += 2 * space + slash + measure(parent, size, medium);
+		used += 2 * space + slash + measure(parent, size, sansMedium);
 	}
 	return { pieces, width: used };
 };
@@ -152,13 +167,13 @@ export const masthead = (
 	const lineSize = 40;
 	const metaSize = 28;
 	const top = data.view.level === "all";
-	const name = top ? brand : titled(data.view.name);
+	const name = heading(data);
 	let titleSize = most;
-	let title = balance(name, titleSize, bold, 1);
+	let title = balance(name, titleSize, sansBold, 1);
 	for (; titleSize >= 128; titleSize -= 16) {
 		let done = false;
 		for (let n = 1; n <= 3; n++) {
-			const set = balance(name, titleSize, bold, n);
+			const set = balance(name, titleSize, sansBold, n);
 			if (set.width <= room) {
 				title = set;
 				done = true;
@@ -169,7 +184,7 @@ export const masthead = (
 	}
 	const path = top ? undefined : pathLine(data, room);
 	const labelW = Math.max(
-		...meta.map((m) => measure(m.label, metaSize, medium)),
+		...meta.map((m) => measure(m.label, metaSize, sansMedium)),
 	);
 	const matrix = qr(data.url);
 	const leading = Math.round(titleSize * 0.98);
@@ -177,7 +192,7 @@ export const masthead = (
 		[];
 	let y = 0;
 	if (path) {
-		y = cap(markSize, bold);
+		y = cap(markSize, sansBold);
 		steps.push({
 			y,
 			draw: (s, x, b) => {
@@ -197,49 +212,67 @@ export const masthead = (
 		});
 		y += markPitch;
 	}
-	y += cap(titleSize, bold);
+	y += cap(titleSize, sansBold);
 	const titleTop = y;
 	for (const [k, line] of title.lines.entries()) {
 		const at = titleTop + k * leading;
 		steps.push({
 			y: at,
 			draw: (s, x, b) =>
-				s.text(x, b, line, titleSize, bold, ink, "start", 0, -titleSize / 48),
+				s.text(
+					x,
+					b,
+					line,
+					titleSize,
+					sansBold,
+					ink,
+					"start",
+					0,
+					-titleSize / 48,
+				),
 		});
 	}
 	y = titleTop + (title.lines.length - 1) * leading;
 	const widest = Math.max(
 		title.width,
-		path ? path.width : measure(brand, markSize, bold),
+		path ? path.width : measure(brand, markSize, sansBold),
 	);
+	const bound = Math.max(room, widest);
 	let urlSize = urlMax;
-	while (
-		urlSize > 36 &&
-		measure(data.url, urlSize, medium) > Math.max(room, widest)
-	)
+	while (urlSize > 36 && measure(data.url, urlSize, sansMedium) > bound)
 		urlSize -= 4;
-	y += Math.round(titleSize * 0.36) + cap(urlSize, medium);
+	const address = fill(
+		data.url.split(/(?<=,)/),
+		urlSize,
+		sansMedium,
+		bound,
+		"",
+	);
+	const urlW = maxOf(address.map((l) => measure(l, urlSize, sansMedium)));
+	const urlPitch = Math.round(urlSize * 1.3);
+	y += Math.round(titleSize * 0.36) + cap(urlSize, sansMedium);
 	const urlY = y;
 	steps.push({
 		y: urlY,
 		draw: (s, x, b) =>
-			s.link(data.url, (inner) =>
-				inner.text(x, b, data.url, urlSize, medium, link),
-			),
+			s.link(data.url, (inner) => {
+				for (const [k, line] of address.entries())
+					inner.text(x, b + k * urlPitch, line, urlSize, sansMedium, link);
+			}),
 	});
+	y += (address.length - 1) * urlPitch;
 	const pitch = Math.round(lineSize * 1.3);
 	const metaPitch = Math.round(metaSize * 1.35);
 	const textXOf = (n: number) => {
 		const side =
-			cap(lineSize, regular) + (n - 1) * pitch + 40 + meta.length * metaPitch;
+			cap(lineSize, sans) + (n - 1) * pitch + 40 + meta.length * metaPitch;
 		return Math.ceil(
 			side + Math.max(64, Math.ceil((4 * side) / matrix.length)),
 		);
 	};
-	const bound = Math.max(room, widest);
 	const words = selection(data);
 	const wrapped = (n: number) => [
-		...fill(words, lineSize, regular, bound - textXOf(n)),
+		...fill(words, lineSize, sans, bound - textXOf(n)),
 		totals(data),
 	];
 	let lines = wrapped(2);
@@ -256,7 +289,7 @@ export const masthead = (
 		y += pitch;
 		rows.push({
 			y,
-			draw: (s, x, b) => s.text(x, b, line, lineSize, regular, ink),
+			draw: (s, x, b) => s.text(x, b, line, lineSize, sans, ink),
 		});
 	}
 	y += 40;
@@ -265,23 +298,23 @@ export const masthead = (
 		rows.push({
 			y,
 			draw: (s, x, b) => {
-				s.text(x, b, m.label, metaSize, medium, grey);
+				s.text(x, b, m.label, metaSize, sansMedium, grey);
 				if (m.link)
 					s.link(m.value, (inner) =>
-						inner.text(x + labelW + 24, b, m.value, metaSize, regular, link),
+						inner.text(x + labelW + 24, b, m.value, metaSize, sans, link),
 					);
-				else s.text(x + labelW + 24, b, m.value, metaSize, regular, ink);
+				else s.text(x + labelW + 24, b, m.value, metaSize, sans, ink);
 			},
 		});
 	}
-	const qrTop = rows[0].y - cap(lineSize, regular);
+	const qrTop = rows[0].y - cap(lineSize, sans);
 	const side = y - qrTop;
 	const unit = side / matrix.length;
 	const qrGap = Math.max(64, Math.ceil(4 * unit));
 	const textX = Math.ceil(side + qrGap);
 	const infoW = Math.max(
-		...lines.map((l) => measure(l, lineSize, regular)),
-		...meta.map((m) => labelW + 24 + measure(m.value, metaSize, regular)),
+		...lines.map((l) => measure(l, lineSize, sans)),
+		...meta.map((m) => labelW + 24 + measure(m.value, metaSize, sans)),
 	);
 	const shape = (x0: number, y0: number) => {
 		const f = (v: number) => v.toFixed(2);
@@ -311,11 +344,7 @@ export const masthead = (
 	for (const row of rows)
 		steps.push({ y: row.y, draw: (s, x, b) => row.draw(s, x + textX, b) });
 	return {
-		width: Math.max(
-			title.width,
-			measure(data.url, urlSize, medium),
-			textX + infoW,
-		),
+		width: Math.max(title.width, urlW, textX + infoW),
 		height: y + 12,
 		boxes: [
 			...(path ? [{ x0: 0, y0: 0, x1: path.width, y1: markPitch }] : []),
@@ -323,12 +352,12 @@ export const masthead = (
 				x0: 0,
 				y0: path ? markPitch : 0,
 				x1: title.width,
-				y1: urlY - cap(urlSize, medium),
+				y1: urlY - cap(urlSize, sansMedium),
 			},
 			{
 				x0: 0,
-				y0: urlY - cap(urlSize, medium),
-				x1: Math.max(measure(data.url, urlSize, medium), textX + infoW),
+				y0: urlY - cap(urlSize, sansMedium),
+				x1: Math.max(urlW, textX + infoW),
 				y1: y + 12,
 			},
 		],

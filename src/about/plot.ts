@@ -1,3 +1,4 @@
+import { names } from "../poster/names";
 import type { About } from "./resolve";
 import type { Words } from "./words";
 
@@ -58,9 +59,6 @@ export const logSpan = (values: number[]) => {
 	};
 	return [edge(Math.min(...values), false), edge(Math.max(...values), true)];
 };
-
-export const decimals = (step: number) =>
-	Math.max(0, -Math.floor(Math.log10(step) + 1e-9));
 
 export const pct = (x: number, digits = 0) => `${(100 * x).toFixed(digits)}%`;
 
@@ -233,13 +231,7 @@ export const order = (about: About, views: string[]) =>
 export const land = (words: Words, code: string) => {
 	if (code === "") return words.blank;
 	if (code === "other") return words.other;
-	try {
-		return (
-			new Intl.DisplayNames(["en-GB"], { type: "region" }).of(code) ?? code
-		);
-	} catch {
-		return code;
-	}
+	return names[code] ?? code;
 };
 
 export const near = <T>(items: T[], key: (item: T) => number, at: number) => {

@@ -2,6 +2,7 @@ import { existsSync } from "node:fs";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { build } from "vite";
+import { respond } from "./serve";
 import type { Meta } from "./src/data";
 
 const [data, work, part, parts] = process.argv.slice(2);
@@ -23,21 +24,11 @@ const paths = (id: number) =>
 	["institutions", "venues"].map((tab) => `/${id ? `${id}/` : ""}${tab}/`);
 
 const offline = (api: string) => {
+	const read = respond(data);
 	const local = async (input: string | URL | Request, init?: RequestInit) => {
 		const url = input instanceof Request ? input.url : `${input}`;
 		if (!url.startsWith(`${api}/`)) throw new Error(`offline: ${url}`);
-		const file = Bun.file(`${data}/${url.slice(api.length + 1)}`);
-		if (!(await file.exists())) return new Response(null, { status: 404 });
-		const range = new Headers(init?.headers)
-			.get("Range")
-			?.match(/^bytes=(\d+)-(\d+)$/);
-		if (!range) return new Response(file);
-		const from = Number(range[1]);
-		const to = Math.min(Number(range[2]), file.size - 1);
-		return new Response(file.slice(from, to + 1), {
-			status: 206,
-			headers: { "Content-Range": `bytes ${from}-${to}/${file.size}` },
-		});
+		return read(new Request(`http://release${url.slice(api.length)}`, init));
 	};
 	globalThis.fetch = Object.assign(local, { preconnect: fetch.preconnect });
 };
@@ -101,8 +92,9 @@ const main = async () => {
 		},
 	});
 	const { app, meta } = await open(out);
+	const full = views(meta.nodes);
 	const pages = [
-		...views(meta.nodes).flatMap(({ node }) => paths(node.id)),
+		...full.flatMap(({ node }) => paths(node.id)),
 		"/en/about/",
 		"/zh/about/",
 	];
@@ -137,6 +129,11 @@ const main = async () => {
   </head>
 </html>
 `,
+	);
+	const known = new Set(full.map(({ node }) => node.id));
+	await write(
+		"/empty.json",
+		JSON.stringify([...meta.nodes.keys()].filter((id) => !known.has(id))),
 	);
 	await write(
 		"/sitemap.xml",

@@ -1,3 +1,5 @@
+import type { Lang } from "./words/index.ts";
+
 type Pair = [number, number];
 type View = string;
 type Venue = {
@@ -23,7 +25,6 @@ export type About = {
 	default_years: Pair;
 	corpus: {
 		papers: number;
-		by_year: [number, number, number][];
 		venues: number;
 		institutions: number;
 		people: number;
@@ -42,7 +43,6 @@ export type About = {
 		subfields: Record<string, string>;
 	};
 	example: {
-		work: string;
 		title: string;
 		venue: string;
 		year: number;
@@ -121,13 +121,6 @@ export type About = {
 		years: number[];
 		series: { country: string; share: number[] }[];
 	};
-	stability: {
-		view: View;
-		name: string;
-		mean: number;
-		n: number;
-		rho: Pair[];
-	}[];
 	scaling: {
 		rows: Slope[];
 		high: Slope;
@@ -170,7 +163,6 @@ const formats: Record<string, (value: unknown, path: string) => string> = {
 	pct1: (value, path) => `${(100 * number(value, path)).toFixed(1)}%`,
 	d1: (value, path) => number(value, path).toFixed(1),
 	d2: (value, path) => number(value, path).toFixed(2),
-	d3: (value, path) => number(value, path).toFixed(3),
 	raw: (value, path) => {
 		if (typeof value === "string") return value;
 		return `${number(value, path)}`;
@@ -180,9 +172,13 @@ const formats: Record<string, (value: unknown, path: string) => string> = {
 const step = (from: unknown, segment: string, path: string) => {
 	const [, key, filter] = segment.match(/^([^[\]]+)(?:\[([^\]]+)\])?$/) ?? [];
 	if (key === undefined) throw new Error(`bad path: ${path}`);
-	if (from === null || typeof from !== "object" || !Object.hasOwn(from, key))
+	const at =
+		Array.isArray(from) && /^-\d+$/.test(key)
+			? `${from.length + Number(key)}`
+			: key;
+	if (from === null || typeof from !== "object" || !Object.hasOwn(from, at))
 		throw new Error(`unknown path: ${path}`);
-	const value = (from as Record<string, unknown>)[key];
+	const value = (from as Record<string, unknown>)[at];
 	if (filter === undefined) return value;
 	if (!Array.isArray(value)) throw new Error(`not a list: ${path}`);
 	const want = filter.split(",").map((pair) => pair.split("="));
@@ -204,14 +200,121 @@ const parts = (path: string) => path.match(/(?:[^.[\]]|\[[^\]]*\])+/g) ?? [];
 export const pick = (about: About, path: string) =>
 	parts(path).reduce<unknown>((at, part) => step(at, part, path), about);
 
+const lists: Record<Lang, (items: string[]) => string> = {
+	en: (items) => {
+		const [between, last] = items.some((item) => item.includes(","))
+			? ["; ", "; and "]
+			: [", ", " and "];
+		return items.length < 2
+			? items.join("")
+			: `${items.slice(0, -1).join(between)}${last}${items.at(-1)}`;
+	},
+	zh: (items) =>
+		items.length < 2
+			? items.join("")
+			: `${items.slice(0, -1).join("、")} 和 ${items.at(-1)}`,
+};
+
+const share = (mass: number[]) => mass[0] / mass.reduce((a, b) => a + b, 0);
+
+const claims: [string, (about: About) => boolean][] = [
+	[
+		"the top 1% share and the mean FWCI fall at every step in all views",
+		({ validity: { falls } }) =>
+			falls.top1 === falls.views && falls.fwci === falls.views,
+	],
+	[
+		"the top 10% share falls at every step except between the level T2 and T3 of field 18",
+		({ validity: { falls, rows } }) => {
+			const [t1, t2, t3, t4] = rows
+				.filter((row) => row.view === "field/18")
+				.sort((a, b) => a.tier - b.tier)
+				.map((row) => row.top10);
+			return (
+				falls.views - falls.top10 === 1 &&
+				t1 > t2 &&
+				t2 <= t3 &&
+				t3 - t2 < 0.005 &&
+				t3 > t4
+			);
+		},
+	],
+	[
+		"beta is above 1 in All",
+		({ scaling }) =>
+			(scaling.rows.find((row) => row.view === "all")?.slope ?? 0) > 1,
+	],
+	[
+		"scaling.low and scaling.high hold the lowest and highest beta of the fields",
+		({ scaling: { rows, low, high } }) => {
+			const slopes = rows
+				.filter((row) => row.view !== "all")
+				.map((row) => row.slope);
+			return (
+				low.slope === Math.min(...slopes) && high.slope === Math.max(...slopes)
+			);
+		},
+	],
+	[
+		"the share of the United States fell and the share of China rose over the years",
+		({ years, countries }) => {
+			const ends = (code: string) => {
+				const series = countries.series.find((s) => s.country === code);
+				return series ? [series.share[0], series.share.at(-1) ?? 0] : [0, 0];
+			};
+			const [us0, us1] = ends("US");
+			const [cn0, cn1] = ends("CN");
+			return (
+				countries.years[0] === years[0] &&
+				countries.years.at(-1) === years[1] &&
+				us1 < us0 &&
+				cn1 > cn0
+			);
+		},
+	],
+	[
+		"upstream names the fields with the largest and smallest T1 shares in order",
+		({ composition, upstream }) => {
+			const order = composition
+				.filter((row) => row.view !== "all")
+				.sort(
+					(a, b) => share(b.mass) - share(a.mass) || (a.view < b.view ? -1 : 1),
+				)
+				.map((row) => row.view);
+			const top = upstream.top.map((row) => row.view);
+			const bottom = upstream.bottom.map((row) => row.view).reverse();
+			return (
+				`${top}` === `${order.slice(0, top.length)}` &&
+				`${bottom}` === `${order.slice(-bottom.length)}`
+			);
+		},
+	],
+	[
+		"the example paper lies mostly in field 17 and reaches at least three fields in falling order",
+		({ example: { K, fields }, tier_example }) =>
+			tier_example.view === "field/17" &&
+			fields.length >= 3 &&
+			fields[0].field === 17 &&
+			2 * fields[0].k >= K &&
+			fields.every((field, k) => !k || field.k <= fields[k - 1].k),
+	],
+];
+
 export const resolve = (
 	markdown: string,
 	about: About,
+	lang: Lang,
 	extra: Record<string, unknown> = {},
 ) => {
+	for (const [claim, holds] of claims)
+		if (!holds(about)) throw new Error(`claim fails: ${claim}`);
 	const out = markdown.replace(
 		/\{\{([^{}|]+)\|([a-z0-9]+)\}\}/g,
-		(_, path, format) => {
+		(_, path: string, format: string) => {
+			if (format === "list")
+				return lists[lang](
+					path.split("+").map((item) => formats.raw(pick(about, item), item)),
+				);
 			const show = formats[format];
 			if (!show) throw new Error(`unknown format: ${format}`);
 			return show(path in extra ? extra[path] : pick(about, path), path);

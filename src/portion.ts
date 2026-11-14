@@ -25,6 +25,6 @@ addEventListener(
 		} catch {
 			postMessage({ key });
 		}
-		drop(`views/${level}/${id}`);
+		drop(`views/${level}/${id}/`);
 	},
 );

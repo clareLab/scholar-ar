@@ -1,4 +1,4 @@
-import { cap, type Font, measure } from "./fonts";
+import { cap, measure } from "./fonts";
 import { ladderFor, plotFork, probeFork, sheet } from "./fork";
 import { decade } from "./format";
 import { countriesBlock, drawLedger, planLedger } from "./ledger";
@@ -16,14 +16,17 @@ import {
 	rule,
 } from "./palette";
 import { type Rect, Scene } from "./scene";
-import type { Block } from "./sheet";
+import {
+	type Block,
+	condMedium,
+	maxOf,
+	radius,
+	sans,
+	sansMedium,
+} from "./sheet";
 
 export const page = { width: 7200, height: 9600 };
 const margin = 256;
-
-const label: Font = { family: "sans", weight: 500 };
-const plain: Font = { family: "sans", weight: 400 };
-const name: Font = { family: "cond", weight: 500 };
 
 const fourth = (x: number) => {
 	const digits = Math.max(0, 3 - Math.floor(Math.log10(Math.abs(x))));
@@ -47,15 +50,15 @@ const keyBlock = (
 	const rMax = Math.max(...shown.map(rad));
 	const row = Math.max(2 * rMax, 48);
 	const sample = 40;
-	const anatomy = cap(sample, name) + 32;
+	const anatomy = cap(sample, condMedium) + 32;
 	const continents = derived.shown;
 	const swatch = 28;
 	const pieces = continents.map((c) => ({
 		c,
-		w: swatch + 12 + measure(c, size, plain) + 40,
+		w: swatch + 12 + measure(c, size, sans) + 40,
 	}));
-	const lead = measure("Dot colour = country, by continent", size, label);
-	const { beta, scale } = data.model;
+	const lead = measure("Dot colour = country, by continent", size, sansMedium);
+	const model = data.model;
 	const years = data.selection;
 	const span =
 		years.from === years.to ? `${years.from}` : `${years.from} to ${years.to}`;
@@ -85,23 +88,17 @@ const keyBlock = (
 		lineH +
 		lineH +
 		gap +
-		lineH * 2;
+		lineH * (model ? 2 : 1);
 	const lines = [
 		lead + 32 + pieces.reduce((a, p) => a + p.w, 0),
-		measure(blocks, size, label) +
+		measure(blocks, size, sansMedium) +
 			32 +
-			blockItems.reduce(
-				(a, t) => a + bw + 12 + measure(t, size, plain) + 40,
-				0,
-			),
-		measure("Rank", size, label) +
+			blockItems.reduce((a, t) => a + bw + 12 + measure(t, size, sans) + 40, 0),
+		measure("Rank", size, sansMedium) +
 			32 +
-			ends.reduce(
-				(a, t) => a + 2 * dot + 12 + measure(t, size, plain) + 40,
-				0,
-			) +
+			ends.reduce((a, t) => a + 2 * dot + 12 + measure(t, size, sans) + 40, 0) +
 			shiftItems.reduce(
-				(a, t) => a + bell + 12 + measure(t, size, plain) + 40,
+				(a, t) => a + bell + 12 + measure(t, size, sans) + 40,
 				0,
 			),
 	];
@@ -112,95 +109,103 @@ const keyBlock = (
 			const cy = y + row / 2;
 			scene.text(
 				x,
-				cy + cap(size, label) / 2,
+				cy + cap(size, sansMedium) / 2,
 				"Dot area = Count",
 				size,
-				label,
+				sansMedium,
 				ink,
 			);
-			let cx = x + measure("Dot area = Count", size, label) + 48;
+			let cx = x + measure("Dot area = Count", size, sansMedium) + 48;
 			for (const v of shown) {
 				const r = rad(v);
 				scene.dots(quiet, 0.6, [[cx + r, cy, r]]);
 				const text = decade(v);
 				scene.text(
 					cx + 2 * r + 12,
-					cy + cap(size, plain) / 2,
+					cy + cap(size, sans) / 2,
 					text,
 					size,
-					plain,
+					sans,
 					ink,
 				);
-				cx += 2 * r + 12 + measure(text, size, plain) + 40;
+				cx += 2 * r + 12 + measure(text, size, sans) + 40;
 			}
-			let by = y + row + gap + cap(size, label);
-			scene.text(x, by, "Dot colour = country, by continent", size, label, ink);
+			let by = y + row + gap + cap(size, sansMedium);
+			scene.text(
+				x,
+				by,
+				"Dot colour = country, by continent",
+				size,
+				sansMedium,
+				ink,
+			);
 			cx = x + lead + 32;
 			for (const p of pieces) {
 				scene.dots(familyTone(p.c), 0.92, [
-					[cx + swatch / 2, by - cap(size, plain) / 2, swatch / 2],
+					[cx + swatch / 2, by - cap(size, sans) / 2, swatch / 2],
 				]);
-				scene.text(cx + swatch + 12, by, p.c, size, plain, ink);
+				scene.text(cx + swatch + 12, by, p.c, size, sans, ink);
 				cx += p.w;
 			}
-			by += lineH - cap(size, label) + gap;
-			const base = by + cap(sample, name);
+			by += lineH - cap(size, sansMedium) + gap;
+			const base = by + cap(sample, condMedium);
 			const rank = "Rank ";
-			scene.text(x, base, rank, sample, plain, quiet);
+			scene.text(x, base, rank, sample, sans, quiet);
 			scene.text(
-				x + measure(rank, sample, plain),
+				x + measure(rank, sample, sans),
 				base,
 				"Institution",
 				sample,
-				name,
+				condMedium,
 				ink,
 			);
-			by = base + 32 + gap + cap(size, label);
-			scene.text(x, by, "Count by year", size, label, ink);
-			let kx = x + measure("Count by year", size, label) + 40;
-			const sq = Math.round(cap(size, plain));
+			by = base + 32 + gap + cap(size, sansMedium);
+			scene.text(x, by, "Count by year", size, sansMedium, ink);
+			let kx = x + measure("Count by year", size, sansMedium) + 40;
+			const sq = Math.round(cap(size, sans));
 			scene.rect(kx, by - sq, sq, sq, ink);
-			scene.text(kx + sq + 12, by, span, size, plain, ink);
-			kx += sq + 12 + measure(span, size, plain) + 40;
+			scene.text(kx + sq + 12, by, span, size, sans, ink);
+			kx += sq + 12 + measure(span, size, sans) + 40;
 			scene.rect(kx, by - sq, sq, sq, rule);
-			scene.text(kx + sq + 12, by, "Other years", size, plain, ink);
+			scene.text(kx + sq + 12, by, "Other years", size, sans, ink);
 			by += lineH + gap;
-			scene.text(x, by, blocks, size, label, ink);
-			kx = x + measure(blocks, size, label) + 32;
-			const mid = by - cap(size, plain) / 2;
+			scene.text(x, by, blocks, size, sansMedium, ink);
+			kx = x + measure(blocks, size, sansMedium) + 32;
+			const mid = by - cap(size, sans) / 2;
 			for (const [k, t] of blockItems.entries()) {
 				const piece = sheet(kx, mid - bh / 2, bw, bh);
 				if (k === 2) scene.path(piece, "none", loss, 1.5);
 				else scene.path(piece, k ? gain : par);
-				scene.text(kx + bw + 12, by, t, size, plain, ink);
-				kx += bw + 12 + measure(t, size, plain) + 40;
+				scene.text(kx + bw + 12, by, t, size, sans, ink);
+				kx += bw + 12 + measure(t, size, sans) + 40;
 			}
 			by += lineH;
-			scene.text(x, by, "Rank", size, label, ink);
-			kx = x + measure("Rank", size, label) + 32;
-			const my = by - cap(size, plain) / 2;
+			scene.text(x, by, "Rank", size, sansMedium, ink);
+			kx = x + measure("Rank", size, sansMedium) + 32;
+			const my = by - cap(size, sans) / 2;
 			for (const [k, t] of ends.entries()) {
 				if (k) scene.dots(ink, 1, [[kx + dot, my, dot]]);
 				else scene.dots(paper, 1, [[kx + dot, my, dot]], ink, 2);
-				scene.text(kx + 2 * dot + 12, by, t, size, plain, ink);
-				kx += 2 * dot + 12 + measure(t, size, plain) + 40;
+				scene.text(kx + 2 * dot + 12, by, t, size, sans, ink);
+				kx += 2 * dot + 12 + measure(t, size, sans) + 40;
 			}
 			for (const [k, t] of shiftItems.entries()) {
 				scene.line(kx + 4, my, kx + bell - 4, my, k ? loss : gain, 3);
-				scene.text(kx + bell + 12, by, t, size, plain, ink);
-				kx += bell + 12 + measure(t, size, plain) + 40;
+				scene.text(kx + bell + 12, by, t, size, sans, ink);
+				kx += bell + 12 + measure(t, size, sans) + 40;
 			}
 			by += lineH + gap;
-			scene.text(x, by, "Excess = Count − Expected", size, plain, ink);
+			scene.text(x, by, "Excess = Count − Expected", size, sans, ink);
+			if (!model) return;
 			by += lineH;
-			const lead2 = `Expected = ${fourth(scale)} × Authors`;
-			scene.text(x, by, lead2, size, plain, ink);
+			const lead2 = `Expected = ${fourth(model.scale)} × Authors`;
+			scene.text(x, by, lead2, size, sans, ink);
 			scene.text(
-				x + measure(lead2, size, plain) + 4,
+				x + measure(lead2, size, sans) + 4,
 				by - size * 0.42,
-				fourth(beta),
+				fourth(model.beta),
 				20,
-				plain,
+				sans,
 				ink,
 			);
 		},
@@ -212,13 +217,9 @@ export const compose = (data: Data, meta: Meta) => {
 	const width = page.width - 2 * margin;
 	const bottom = page.height - margin;
 	const inst = data.institutions;
-	const cMax = Math.max(...inst.map((r) => r.count / 1e6));
-	const rad = (n: number) => Math.max(2, 64 * Math.sqrt(n / cMax));
-	const attempt = (
-		inside: boolean,
-		boost: boolean,
-		most = Number.POSITIVE_INFINITY,
-	) => {
+	const cMax = maxOf(inst.map((r) => r.count / 1e6));
+	const rad = radius(cMax);
+	const attempt = (inside: boolean, boost: boolean) => {
 		const probe = ladderFor(data, bottom - margin);
 		const natural = inside
 			? probe.height +
@@ -240,7 +241,6 @@ export const compose = (data: Data, meta: Meta) => {
 			inside ? bottom - margin - natural - 192 : 2944,
 			!inside,
 			boost,
-			most,
 		);
 		const ledgerTop = bottom - ledger.height;
 		const forkBottom = ledgerTop - 192;
@@ -276,12 +276,12 @@ export const compose = (data: Data, meta: Meta) => {
 		let least = Number.POSITIVE_INFINITY;
 		for (const most of [384, 320, 256, 224, 192, 160]) {
 			const candidate = masthead(data, meta, Math.round(width * 0.5), most);
-			const compression = probeFork(data, region, candidate, key, spec);
-			if (compression < least - 0.02) {
-				least = compression;
+			const steps = probeFork(data, region, candidate, key, spec);
+			if (steps < least) {
+				least = steps;
 				head = candidate;
 			}
-			if (compression <= 0.04) break;
+			if (steps <= 1) break;
 		}
 		const fork = plotFork(data, derived, region, head, key, spec, beside);
 		return { ledger, ledgerTop, nations, beside, fork, head, key };
@@ -314,5 +314,5 @@ export const compose = (data: Data, meta: Meta) => {
 	])
 		for (const code of layer.flags) scene.flags.add(code);
 	drawLedger(scene, ledger, margin, ledgerTop);
-	return { scene, derived, ledger, fork, nations: Boolean(nations) };
+	return { scene };
 };

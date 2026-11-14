@@ -26,10 +26,7 @@ import {
 } from "./palette";
 import { Board, Ground, overlaps, Rails, ranked, type Segment } from "./place";
 import { type Box, Field, type Rect, Scene, textBox } from "./scene";
-
-const cond: Font = { family: "cond", weight: 500 };
-const sans: Font = { family: "sans", weight: 400 };
-const sansMedium: Font = { family: "sans", weight: 500 };
+import { condMedium, maxOf, minOf, radius, sans, sansMedium } from "./sheet";
 
 export type Region = { x0: number; y0: number; x1: number; y1: number };
 
@@ -123,7 +120,7 @@ export const ladderSpec = (data: Data, L: number, K: number, room: number) => {
 			L * 32,
 			Math.max(
 				measure("Institution", H, sansMedium),
-				...shown.map((i) => measure(clean(inst[i].name), L, cond)),
+				...shown.map((i) => measure(clean(inst[i].name), L, condMedium)),
 			),
 		),
 	);
@@ -183,7 +180,7 @@ export const ladderSpec = (data: Data, L: number, K: number, room: number) => {
 	const lines = (i: number) => {
 		let got = cache.get(i);
 		if (!got) {
-			got = wrap(clean(inst[i].name), L, cond, nameW);
+			got = wrap(clean(inst[i].name), L, condMedium, nameW);
 			cache.set(i, got);
 		}
 		return got;
@@ -226,13 +223,13 @@ export const ladderSpec = (data: Data, L: number, K: number, room: number) => {
 	};
 	const row = (scene: Scene, x: number, y: number, i: number) => {
 		const r = inst[i];
-		const base = y + Math.round(pitch * 0.5 + cap(L, cond) / 2);
-		const mid = base - cap(L, cond) / 2;
+		const base = y + Math.round(pitch * 0.5 + cap(L, condMedium) / 2);
+		const mid = base - cap(L, condMedium) / 2;
 		scene.text(x + rankW, base, whole(r.rankExcess), L, sans, quiet, "end");
 		if (r.country)
 			scene.flag(r.country, x + flagX, mid - (flagW * 0.75) / 2, flagW);
 		for (const [k, line] of lines(i).entries())
-			scene.text(x + nameX, base + k * pitch, line, L, cond, ink);
+			scene.text(x + nameX, base + k * pitch, line, L, condMedium, ink);
 		for (const [k, v] of values(r).entries())
 			scene.text(
 				x + rights[k],
@@ -345,12 +342,13 @@ const setup = (
 	const xd1 = ladderX - fanW;
 	const gapX = xd1 + 24;
 	const inst = data.institutions;
-	const A = inst.map((r) => papers(r.authors));
+	const plotted = inst.flatMap((r, i) => (r.authors > 0 ? [i] : []));
+	const A = plotted.map((i) => papers(inst[i].authors));
 	const settled = (v: number) => Number(v.toPrecision(12));
-	const E = inst.map((r) => settled(papers(r.excess)));
-	const C = inst.map((r) => papers(r.count));
-	const aLo = Math.log10(Math.min(...A)) - 0.15;
-	const aHi = Math.log10(Math.max(...A)) + 0.06;
+	const E = plotted.map((i) => settled(papers(inst[i].excess)));
+	const C = plotted.map((i) => papers(inst[i].count));
+	const aLo = Math.log10(minOf(A)) - 0.15;
+	const aHi = Math.log10(maxOf(A)) + 0.06;
 	const sx = (a: number) =>
 		x0 + ((Math.log10(a) - aLo) / (aHi - aLo)) * (xd1 - x0);
 	const ax = (x: number) => 10 ** (aLo + ((x - x0) / (xd1 - x0)) * (aHi - aLo));
@@ -358,14 +356,13 @@ const setup = (
 	const median = abs[Math.floor(abs.length / 2)] || 1e-3;
 	const c = 10 ** Math.round(Math.log10(median / 4));
 	const g = (e: number) => Math.sign(e) * Math.log10(1 + Math.abs(e) / c);
-	const gMax = g(Math.max(...E));
-	const gMin = g(Math.min(...E));
-	const span = gMax - gMin;
-	const cMax = Math.max(...C);
-	const rMax = 64;
-	const rad = (n: number) => Math.max(2, rMax * Math.sqrt(n / cMax));
-	const beta = settled(data.model.beta);
-	const scale = settled(data.model.scale);
+	const gMax = g(maxOf(E));
+	const gMin = g(minOf(E));
+	const span = gMax - gMin || 1;
+	const cMax = maxOf(inst.map((r) => papers(r.count)));
+	const rad = radius(cMax);
+	const beta = settled(data.model?.beta ?? 0);
+	const scale = settled(data.model?.scale ?? 0);
 	const expected = (a: number) => scale * a ** beta;
 	const base = gMax + 0.05 * span;
 	let top = base;
@@ -388,15 +385,15 @@ const setup = (
 	let dots: Dot[] = [];
 	const build = () => {
 		sy = (e: number) => y0 + ((top - g(e)) / (top - bottom)) * (y1 - y0);
-		dots = inst.map((_, i) => ({
+		dots = plotted.map((i, k) => ({
 			i,
-			x: sx(A[i]),
-			y: sy(E[i]),
-			r: rad(C[i]),
-			count: C[i],
+			x: sx(A[k]),
+			y: sy(E[k]),
+			r: rad(C[k]),
+			count: C[k],
 		}));
 	};
-	let fitted = false;
+	let steps = Number.POSITIVE_INFINITY;
 	for (let k = 0; k < 64; k++) {
 		build();
 		const clear = (b: Box) =>
@@ -408,7 +405,7 @@ const setup = (
 					d.y + d.r > b.y0,
 			);
 		if (heads.every(clear)) {
-			fitted = true;
+			steps = k;
 			break;
 		}
 		top += 0.04 * span;
@@ -433,14 +430,12 @@ const setup = (
 		g,
 		top,
 		bottom,
-		span,
 		cMax,
 		expected,
 		heads,
 		sy,
 		dots,
-		fitted,
-		base,
+		steps,
 	};
 };
 
@@ -451,8 +446,7 @@ export const probeFork = (
 	key: { width: number; height: number },
 	spec: Spec,
 ) => {
-	const f = setup(data, region, head, key, spec);
-	return f.fitted ? (f.top - f.base) / f.span : Number.POSITIVE_INFINITY;
+	return setup(data, region, head, key, spec).steps;
 };
 
 const frame = (
@@ -631,7 +625,7 @@ export const plotFork = (
 	const decades: number[] = [];
 	for (let e = Math.ceil(aLo); e <= Math.floor(aHi); e++) decades.push(10 ** e);
 	const ticks: number[] = [0];
-	const most = Math.max(...E.map(Math.abs));
+	const most = maxOf(E.map(Math.abs));
 	for (let e = Math.round(Math.log10(c)); 10 ** e <= most * 1.0001; e++) {
 		if (g(10 ** e) <= top) ticks.push(10 ** e);
 		if (-g(10 ** e) >= bottom) ticks.push(-(10 ** e));
@@ -641,7 +635,7 @@ export const plotFork = (
 		const x = sx(a);
 		const near = dots.filter((d) => Math.abs(d.x - x) <= reachX);
 		if (!near.length) continue;
-		const from = Math.min(...near.map((d) => d.y - d.r)) - 64;
+		const from = minOf(near.map((d) => d.y - d.r)) - 64;
 		const to = Math.min(y1, floorY(x));
 		if (to - from < 96) continue;
 		let start = from;
@@ -662,7 +656,7 @@ export const plotFork = (
 		const y = sy(t);
 		const near = dots.filter((d) => Math.abs(d.y - y) <= 48);
 		if (!near.length) continue;
-		let from = Math.max(x0, Math.min(...near.map((d) => d.x - d.r)) - 24);
+		let from = Math.max(x0, minOf(near.map((d) => d.x - d.r)) - 24);
 		for (const h of holes)
 			if (y > h.y0 - 8 && y < h.y1 + 8 && from > h.x0 - 8 && from < h.x1)
 				from = h.x1 + 8;
@@ -983,7 +977,8 @@ export const plotFork = (
 	const ladder = new Scene();
 	const strands: Segment[] = [];
 	const tieRow = (i: number, mid: number) => {
-		const d = byIndex.get(i) as Dot;
+		const d = byIndex.get(i);
+		if (!d) return;
 		const tint = derived.colour(inst[i].country);
 		const from = d.x + d.r + 2;
 		strings.line(from, d.y, gapX, d.y, tint, 1.5);
@@ -1028,8 +1023,8 @@ export const plotFork = (
 		const s = labelSizes[Math.max(0, stepOf(d.count))];
 		const rank = row.excess > 0 ? whole(row.rankExcess) : "";
 		const rankW = rank ? measure(`${rank} `, s, sans) : 0;
-		const width = rankW + measure(clean(row.name), s, cond);
-		const asc = cap(s, cond) + 2;
+		const width = rankW + measure(clean(row.name), s, condMedium);
+		const asc = cap(s, condMedium) + 2;
 		const desc = s * 0.24;
 		const pad = Math.max(3, s * 0.15);
 		return { s, rank, rankW, width, asc, desc, pad };
@@ -1278,7 +1273,6 @@ export const plotFork = (
 		candidates.filter((d) => inst[d.i].excess > 0),
 		0,
 	);
-	const above = accepted.length;
 	name(
 		candidates.filter((d) => inst[d.i].excess < 0),
 		floor,
@@ -1303,7 +1297,7 @@ export const plotFork = (
 			p.y,
 			clean(row.name),
 			s,
-			cond,
+			condMedium,
 			ink,
 			"start",
 			s * 0.25,
@@ -1318,11 +1312,5 @@ export const plotFork = (
 		front,
 		mosaic,
 		headAt: { x: x0, y: y0 },
-		placed: above,
-		below: accepted.length - above,
-		threshold: above
-			? Math.min(...accepted.slice(0, above).map((p) => p.d.count))
-			: 0,
-		ladder: { rows: spec.K, size: spec.L, end: ladderEnd },
 	};
 };

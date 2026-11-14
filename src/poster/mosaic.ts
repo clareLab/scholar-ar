@@ -1,4 +1,4 @@
-import { balance, cap, type Font, fit, measure } from "./fonts";
+import { balance, cap, fit, measure } from "./fonts";
 import { clean, fixed, nation, percent, snap, whole } from "./format";
 import type { Data, Derived, Institution } from "./model";
 import {
@@ -14,11 +14,7 @@ import {
 const rankInk = soft;
 
 import { type Rect, type Scene, squarify } from "./scene";
-
-const name: Font = { family: "cond", weight: 500 };
-const small: Font = { family: "sans", weight: 400 };
-const title: Font = { family: "sans", weight: 600 };
-const label: Font = { family: "sans", weight: 500 };
+import { condMedium, sans, sansMedium, sansSemi, titleSize } from "./sheet";
 
 const steps = [112, 96, 80, 64, 56, 48, 40, 32, 28, 24, 20, 16, 14, 12, 10, 8];
 
@@ -44,16 +40,13 @@ const layout = (row: Institution, w: number, h: number): Set | undefined => {
 		if (s * 1.6 > h) continue;
 		const es = Math.max(8, snap(s * 0.62));
 		const inset = Math.max(3, Math.round(es * 0.5));
-		if (
-			2 * inset + measure(rank, es, small) + es + measure(count, es, small) >
-			w
-		)
+		if (2 * inset + measure(rank, es, sans) + es + measure(count, es, sans) > w)
 			continue;
-		const set = fit(name_, s, name, w - 2 * pad, 5);
+		const set = fit(name_, s, condMedium, w - 2 * pad, 5);
 		if (!set) continue;
-		const band = inset + cap(es, small) + Math.max(2, Math.round(s * 0.3));
+		const band = inset + cap(es, sans) + Math.max(2, Math.round(s * 0.3));
 		const lead = Math.round(s * 1.06);
-		const height = cap(s, name) + (set.lines.length - 1) * lead;
+		const height = cap(s, condMedium) + (set.lines.length - 1) * lead;
 		if (band + height + pad > h) continue;
 		return {
 			size: s,
@@ -71,8 +64,6 @@ const layout = (row: Institution, w: number, h: number): Set | undefined => {
 	return undefined;
 };
 
-export const keyWidth = 1280;
-
 export const plotMosaic = (
 	scene: Scene,
 	data: Data,
@@ -80,14 +71,13 @@ export const plotMosaic = (
 	rect: Rect,
 ) => {
 	const head = 120;
-	const titleSize = 40;
 	scene.rect(rect.x, rect.y, rect.w, rect.h, paper);
 	scene.text(
 		rect.x,
-		rect.y + cap(titleSize, title),
+		rect.y + cap(titleSize, sansSemi),
 		"INSTITUTIONS BY COUNTRY",
 		titleSize,
-		title,
+		sansSemi,
 		ink,
 		"start",
 		0,
@@ -97,50 +87,67 @@ export const plotMosaic = (
 	const sw = 96;
 	const kx = rect.x + rect.w - classes.length * sw;
 	const ky = rect.y + 4;
-	scene.text(kx - 32, ky + 30, "Count / Expected", keySize, label, ink, "end");
-	scene.text(
-		kx - 32,
-		ky + 30 + 40,
-		"Area = Count",
-		keySize,
-		label,
-		grey,
-		"end",
+	const keyX = kx - 32 - measure("Count / Expected", keySize, sansMedium);
+	const titleW = measure(
+		"INSTITUTIONS BY COUNTRY",
+		titleSize,
+		sansSemi,
+		titleSize * 0.1,
 	);
-	for (const [k, fill] of classes.entries())
-		scene.rect(kx + k * sw, ky + 8, sw, 30, fill);
-	for (const [k, text] of classBounds.entries())
+	if (keyX >= rect.x + titleW + 64) {
 		scene.text(
-			kx + (k + 1) * sw,
-			ky + 8 + 30 + 32,
-			text,
+			kx - 32,
+			ky + 30,
+			"Count / Expected",
 			keySize,
-			small,
+			sansMedium,
 			ink,
-			"middle",
+			"end",
 		);
+		scene.text(
+			kx - 32,
+			ky + 30 + 40,
+			"Area = Count",
+			keySize,
+			sansMedium,
+			grey,
+			"end",
+		);
+		for (const [k, fill] of classes.entries())
+			scene.rect(kx + k * sw, ky + 8, sw, 30, fill);
+		for (const [k, text] of classBounds.entries())
+			scene.text(
+				kx + (k + 1) * sw,
+				ky + 8 + 30 + 32,
+				text,
+				keySize,
+				sans,
+				ink,
+				"middle",
+			);
+	}
 	const tw = 176;
 	const th = 64;
-	const tx = kx - 32 - measure("Count / Expected", keySize, label) - 64 - tw;
+	const tx = keyX - 64 - tw;
 	if (
 		tx >
 		rect.x +
-			measure("INSTITUTIONS BY COUNTRY", titleSize, title) +
+			measure("INSTITUTIONS BY COUNTRY", titleSize, sansSemi) +
 			titleSize * 2.4 +
 			64
 	) {
 		scene.rect(tx, ky, tw, th, classes[5]);
 		const inset = 7;
-		const corner = ky + inset + cap(14, small);
-		scene.text(tx + inset, corner, "Rank", 14, small, rankInk);
-		scene.text(tx + tw - inset, corner, "Count", 14, small, rankInk, "end");
+		const corner = ky + inset + cap(14, sans);
+		scene.text(tx + inset, corner, "Rank", 14, sans, rankInk);
+		scene.text(tx + tw - inset, corner, "Count", 14, sans, rankInk, "end");
 		const below = corner + 7;
 		scene.text(
 			tx + tw / 2,
-			below + (ky + th - inset - below) / 2 + cap(24, name) / 2,
+			below + (ky + th - inset - below) / 2 + cap(24, condMedium) / 2,
 			"Institution",
 			24,
-			name,
+			condMedium,
 			ink,
 			"middle",
 		);
@@ -187,7 +194,6 @@ export const plotMosaic = (
 		let tab: Rect | undefined;
 		let drawTab = () => {};
 		const country = nation(g.n.code);
-		const strong: Font = { family: "sans", weight: 600 };
 		const tail = `${fixed(g.n.count)}\u2003${percent(g.n.share)}`;
 		const tone = derived.colour(g.n.code);
 		const top = Math.min(56, Math.max(12, snap(big / 18)));
@@ -206,10 +212,10 @@ export const plotMosaic = (
 			const lead = s * 0.45 + sw + s * 0.35 + (flagW ? flagW + s * 0.4 : 0);
 			const set =
 				rows === 1
-					? { lines: [country], width: measure(country, s, strong) }
-					: balance(country, s, strong, 2);
+					? { lines: [country], width: measure(country, s, sansSemi) }
+					: balance(country, s, sansSemi, 2);
 			if (rows === 2 && set.lines.length < 2) continue;
-			const tailW = withTail ? measure(tail, s, small) + s * 0.7 : 0;
+			const tailW = withTail ? measure(tail, s, sans) + s * 0.7 : 0;
 			const w = lead + set.width + tailW + s * 0.5;
 			const lh = Math.round(s * 1.15);
 			const h = Math.round(s * 0.6 + lh * set.lines.length);
@@ -219,22 +225,22 @@ export const plotMosaic = (
 			drawTab = () => {
 				scene.rect(t.x, t.y, t.w, t.h, paper);
 				let tx = t.x + s * 0.45;
-				const base = t.y + s * 0.3 + (lh + cap(s, strong)) / 2;
-				scene.rect(tx, base - cap(s, strong) / 2 - sw / 2, sw, sw, tone);
+				const base = t.y + s * 0.3 + (lh + cap(s, sansSemi)) / 2;
+				scene.rect(tx, base - cap(s, sansSemi) / 2 - sw / 2, sw, sw, tone);
 				tx += sw + s * 0.35;
 				if (flagW) {
 					scene.flag(
 						g.n.code,
 						tx,
-						base - cap(s, strong) / 2 - (flagW * 0.75) / 2,
+						base - cap(s, sansSemi) / 2 - (flagW * 0.75) / 2,
 						flagW,
 					);
 					tx += flagW + s * 0.4;
 				}
 				for (const [k, line] of set.lines.entries())
-					scene.text(tx, base + k * lh, line, s, strong, ink);
+					scene.text(tx, base + k * lh, line, s, sansSemi, ink);
 				if (withTail)
-					scene.text(tx + set.width + s * 0.7, base, tail, s, small, grey);
+					scene.text(tx + set.width + s * 0.7, base, tail, s, sans, grey);
 			};
 			break;
 		}
@@ -272,27 +278,20 @@ export const plotMosaic = (
 			const free = area.h - set.band - set.pad;
 			const top = area.y + set.band + (free - set.height) / 2;
 			labels.push(() => {
-				const corner = area.y + set.inset + cap(set.es, small);
-				scene.text(
-					area.x + set.inset,
-					corner,
-					set.rank,
-					set.es,
-					small,
-					rankInk,
-				);
+				const corner = area.y + set.inset + cap(set.es, sans);
+				scene.text(area.x + set.inset, corner, set.rank, set.es, sans, rankInk);
 				scene.text(
 					area.x + area.w - set.inset,
 					corner,
 					set.count,
 					set.es,
-					small,
+					sans,
 					rankInk,
 					"end",
 				);
-				let y = top + cap(set.size, name);
+				let y = top + cap(set.size, condMedium);
 				for (const line of set.lines) {
-					scene.text(cx, y, line, set.size, name, ink, "middle");
+					scene.text(cx, y, line, set.size, condMedium, ink, "middle");
 					y += set.lead;
 				}
 			});
