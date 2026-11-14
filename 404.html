@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en" data-missing>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>AllRankings</title>
+    <script>
+      if (
+        /[?&](from|to|tiers|flip|off|in|above|sort|by|inst|author|venue)=/.test(
+          location.search,
+        )
+      )
+        document.documentElement.classList.add("sift");
+      const gauge = document.createElement("div");
+      gauge.style.cssText =
+        "position: absolute; width: 64px; overflow-y: auto; scrollbar-gutter: stable; visibility: hidden";
+      document.documentElement.append(gauge);
+      document.documentElement.style.setProperty(
+        "--gutter",
+        `${gauge.offsetWidth - gauge.clientWidth}px`,
+      );
+      gauge.remove();
+    </script>
+    <script type="module" crossorigin src="/assets/index-DFLeT5ID.js"></script>
+    <link rel="modulepreload" crossorigin href="/assets/flags-DdtmBUBN.js">
+    <link rel="stylesheet" crossorigin href="/assets/index-CBIfcaiI.css">
+  </head>
+  <body>
+  </body>
+</html>
