@@ -47,7 +47,6 @@ body {
 }
 
 button,
-select,
 input {
   margin: 0;
   padding: 0;
@@ -60,13 +59,8 @@ input {
   appearance: none;
 }
 
-button,
-select {
+button {
   cursor: pointer;
-}
-
-select {
-  width: 4ch;
 }
 
 a {
@@ -182,6 +176,63 @@ h1 {
   width: 0.62em;
   height: 0.85em;
   fill: #ec0000;
+}
+
+.drop {
+  position: absolute;
+  z-index: 4;
+  padding: calc(var(--line) / 2) var(--gap);
+  white-space: normal;
+  background: #fff;
+  border: 1px solid var(--ink);
+}
+
+.cite {
+  top: calc(100% - 1px);
+  right: 24px;
+  left: calc(24px + 18rem + var(--rank));
+  padding-left: calc(var(--gap) - 1px);
+  max-height: calc(100dvh - var(--bar) + 1px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+
+  .code {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    column-gap: var(--gap);
+    align-items: baseline;
+  }
+
+  .code + .code {
+    margin-top: calc(var(--line) / 2);
+  }
+
+  .copy {
+    width: 4em;
+    text-align: right;
+  }
+
+  p,
+  .lines {
+    margin: 0;
+    overflow-wrap: anywhere;
+  }
+
+  .lines,
+  .url {
+    font-variant-ligatures: none;
+  }
+
+  .lines {
+    font-family: "TeX Gyre Cursor", "Courier New", Courier, monospace;
+    font-size: 14px;
+
+    div {
+      padding-left: 4ch;
+      text-indent: -4ch;
+      white-space: pre-wrap;
+    }
+  }
 }
 
 .years {
@@ -311,6 +362,32 @@ h1 {
   display: flex;
   gap: 1em;
   padding-top: 6px;
+}
+
+.pick {
+  button {
+    color: var(--ink);
+  }
+
+  .drop {
+    position: fixed;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scroll-padding-block: calc(var(--line) / 2);
+
+    button {
+      display: block;
+
+      &:hover {
+        text-decoration: underline 1px;
+        text-underline-offset: 0.25em;
+      }
+
+      &:focus-visible {
+        outline-offset: -1px;
+      }
+    }
+  }
 }
 
 .miss {
@@ -554,6 +631,11 @@ main {
     padding: 6px 0 8px;
   }
 
+  .cite {
+    right: 16px;
+    left: 16px;
+  }
+
   .panel {
     position: static;
     height: auto;
@@ -590,7 +672,7 @@ main {
       display: none;
     }
 
-    .lists .on {
+    .lists > button.on {
       color: var(--mute);
       text-decoration: none;
     }

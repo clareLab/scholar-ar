@@ -37,6 +37,13 @@ export const plurals = (word: string) =>
 export const list = (items: string[]) =>
 	new Intl.ListFormat("en-GB", { type: "conjunction" }).format(items);
 
+export const words = (parts: string[][]) =>
+	parts.flatMap((part, k) =>
+		part.map((word, j) =>
+			j === part.length - 1 && k < parts.length - 1 ? `${word},` : word,
+		),
+	);
+
 export const tick = (value: number) => {
 	if (value === 0) return "0";
 	const sign = value > 0 ? "+" : minus;

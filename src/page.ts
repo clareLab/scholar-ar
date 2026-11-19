@@ -57,6 +57,25 @@ export const plain = (event: MouseEvent) =>
 	!event.shiftKey &&
 	!event.altKey;
 
+const swallow = (event: Event) => {
+	event.stopPropagation();
+	event.preventDefault();
+};
+
+const disarm = () => removeEventListener("click", swallow, true);
+
+export const outside = (box: HTMLElement, close: () => void) => {
+	const down = (event: PointerEvent) => {
+		if (box.contains(event.target as Element)) return;
+		addEventListener("click", swallow, { capture: true, once: true });
+		addEventListener("pointerdown", disarm, { capture: true, once: true });
+		addEventListener("keydown", disarm, { capture: true, once: true });
+		close();
+	};
+	addEventListener("pointerdown", down, true);
+	return { destroy: () => removeEventListener("pointerdown", down, true) };
+};
+
 export const save = (blob: Blob, name: string) => {
 	const anchor = document.createElement("a");
 	anchor.href = URL.createObjectURL(blob);

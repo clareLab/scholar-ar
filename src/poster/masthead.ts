@@ -1,5 +1,5 @@
 import { balance, cap, type Font, measure } from "./fonts";
-import { list, plural, plurals, titled, whole } from "./format";
+import { list, plural, titled, words } from "./format";
 import type { Data } from "./model";
 import { grey, ink, link } from "./palette";
 import { qr } from "./qr";
@@ -24,46 +24,11 @@ export const brand = "AllRankings";
 
 const level = (name: string) => name.charAt(0).toUpperCase() + name.slice(1);
 
-const series = (names: string[]) =>
-	names.map((name, k) =>
-		k === names.length - 1 && k
-			? `and ${name}`
-			: k < names.length - 2
-				? `${name},`
-				: name,
-	);
-
-export const selection = (data: Data) => {
-	const parts: string[][] = [];
-	if (data.view.level !== "all") parts.push([level(data.view.level)]);
-	const [from, to] = [data.selection.from, data.selection.to];
-	parts.push([from === to ? `${from}` : `${from} to ${to}`]);
-	parts.push([list(data.selection.tiers.map((t) => `T${t}`))]);
-	const child = data.levels.child;
-	if (child) {
-		const checked = data.children.length + data.zero.length;
-		const noun = plural(data.levels.total, child, plurals(child));
-		parts.push([
-			checked < data.levels.total
-				? `${whole(checked)} of ${noun}`
-				: `all ${noun}`,
-		]);
-	}
-	const places = data.selection.places;
-	parts.push(places ? series(places) : ["all countries"]);
-	const tiers = new Set(data.selection.tiers);
-	const flips = data.selection.flip.map((key) => Number(key.split(".")[0]));
-	const added = flips.filter((t) => !tiers.has(t)).length;
-	const removed = flips.length - added;
-	if (added) parts.push([plural(added, "listing added", "listings added")]);
-	if (removed)
-		parts.push([plural(removed, "listing removed", "listings removed")]);
-	return parts.flatMap((part, k) =>
-		part.map((word, j) =>
-			j === part.length - 1 && k < parts.length - 1 ? `${word},` : word,
-		),
-	);
-};
+export const selection = (data: Data) =>
+	words([
+		...(data.view.level === "all" ? [] : [[level(data.view.level)]]),
+		...data.selection.parts,
+	]);
 
 const fill = (
 	words: string[],
@@ -73,15 +38,20 @@ const fill = (
 	gap = " ",
 ) => {
 	const lines: string[] = [];
-	for (const word of words) {
+	const add = (word: string, joint: string) => {
 		const last = lines[lines.length - 1];
 		if (
 			last !== undefined &&
-			measure(`${last}${gap}${word}`, size, font) <= room
+			measure(`${last}${joint}${word}`, size, font) <= room
 		)
-			lines[lines.length - 1] = `${last}${gap}${word}`;
+			lines[lines.length - 1] = `${last}${joint}${word}`;
 		else lines.push(word);
-	}
+	};
+	for (const word of words)
+		if (measure(word, size, font) <= room) add(word, gap);
+		else
+			for (const [k, piece] of word.split(" ").entries())
+				add(piece, k ? " " : gap);
 	return lines;
 };
 

@@ -1,5 +1,6 @@
 import { defaults, years } from "virtual:years";
 import { type Lang, langs } from "./about/words";
+import { continents } from "./continents";
 import type { Node } from "./data";
 
 export { defaults, years };
@@ -65,6 +66,45 @@ export const where = ({ tab, view, lang }: Place) =>
 
 const list = (value: string | null) => (value ?? "").split(",").filter(Boolean);
 
+const tiered = (key: string) => key.split(".").map(Number);
+
+export const byKey = (a: string, b: string) => {
+	const [s, x] = tiered(a);
+	const [t, y] = tiered(b);
+	return s - t || x - y;
+};
+
+const slug = (name: string) => name.toLowerCase().replaceAll(" ", "-");
+
+export const grouped = (at: string[], lands: string[]) => {
+	const present = new Set(lands);
+	const picked = new Set(at);
+	const groups: string[] = [];
+	const covered = new Set<string>();
+	for (const [name, codes] of continents) {
+		const here = codes.split(" ").filter((code) => present.has(code));
+		if (!here.length || !here.every((code) => picked.has(code))) continue;
+		groups.push(name);
+		for (const code of here) covered.add(code);
+	}
+	return { groups, codes: at.filter((code) => !covered.has(code)) };
+};
+
+export const tokens = (at: string[], lands: string[]) => {
+	const { groups, codes } = grouped(at, lands);
+	return [...groups.map(slug), ...codes.map((code) => code.toLowerCase())];
+};
+
+const expand = (items: string[]) =>
+	new Set(
+		items.flatMap(
+			(item) =>
+				continents.find(([name]) => slug(name) === item)?.[1].split(" ") ?? [
+					item.toUpperCase(),
+				],
+		),
+	);
+
 export const read = (
 	at: { pathname: string; search: string },
 	nodes: Map<number, Node>,
@@ -85,6 +125,7 @@ export const read = (
 	const [low, high] = years;
 	const clamp = (year: number) => Math.min(Math.max(year, low), high);
 	const from = clamp(int("from", defaults[0]));
+	const kids = new Set(nodes.get(place.view)?.children.map((c) => c.id));
 	return {
 		view: place.view,
 		from,
@@ -92,10 +133,14 @@ export const read = (
 		tiers: tiers.filter((t) => (q.get("tiers") ?? "1").includes(`${t}`)),
 		flip: [
 			...new Set(list(q.get("flip")).filter((key) => /^[1-4]\.\d+$/.test(key))),
-		],
-		off: list(q.get("off")).map(Number),
+		].sort(byKey),
+		off: [...new Set(list(q.get("off")).map(Number))]
+			.filter((id) => kids.has(id))
+			.sort((a, b) => a - b),
 		at: q.has("in")
-			? lands.filter((code) => list(q.get("in")).includes(code))
+			? lands.filter((code) =>
+					expand(list(q.get("in")?.toLowerCase() ?? null)).has(code),
+				)
 			: lands,
 		above: means.filter((key) => list(q.get("above")).includes(key)),
 		tab: place.tab,
@@ -116,7 +161,8 @@ const query = (state: Selection, lands: string[]) => {
 	if (state.tiers.join("") !== "1") parts.push(`tiers=${state.tiers.join("")}`);
 	if (state.flip.length) parts.push(`flip=${state.flip.join(",")}`);
 	if (state.off.length) parts.push(`off=${state.off.join(",")}`);
-	if (state.at.length !== lands.length) parts.push(`in=${state.at.join(",")}`);
+	if (state.at.length !== lands.length)
+		parts.push(`in=${tokens(state.at, lands).join(",")}`);
 	return parts;
 };
 
@@ -149,7 +195,7 @@ export const selection = (state: Selection): Selection => ({
 	from: state.from,
 	to: state.to,
 	tiers: [...state.tiers],
-	flip: [...state.flip],
+	flip: [...state.flip].sort(byKey),
 	off: [...state.off].sort((a, b) => a - b),
 	at: [...state.at],
 });

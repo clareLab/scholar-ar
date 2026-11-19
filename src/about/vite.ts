@@ -11,6 +11,7 @@ import { type Lang, words } from "./words/index.ts";
 const data = "\0about-data";
 const snapshot = "virtual:snapshot";
 const years = "virtual:years";
+const edition = "virtual:release";
 
 export const about = (): Plugin => {
 	const path = fileURLToPath(
@@ -23,11 +24,12 @@ export const about = (): Plugin => {
 		resolveId: (id) =>
 			id === data
 				? id
-				: id === snapshot || id === years
+				: id === snapshot || id === years || id === edition
 					? `\0${id}`
 					: undefined,
 		async load(id) {
-			if (![data, `\0${snapshot}`, `\0${years}`].includes(id)) return;
+			if (![data, `\0${snapshot}`, `\0${years}`, `\0${edition}`].includes(id))
+				return;
 			this.addWatchFile(path);
 			const json = await read();
 			if (id === data) return `export default ${JSON.stringify(json)}`;
@@ -36,6 +38,8 @@ export const about = (): Plugin => {
 					throw new Error(`no years in ${path}`);
 				return `export const years = ${JSON.stringify(json.years)};\nexport const defaults = ${JSON.stringify(json.default_years)};`;
 			}
+			if (id === `\0${edition}`)
+				return `export const release = ${JSON.stringify(json?.release ?? "")};\nexport const year = ${new Date().getFullYear()};`;
 			return `export default ${JSON.stringify(json?.snapshot ?? "")}`;
 		},
 		async transform(text, id) {

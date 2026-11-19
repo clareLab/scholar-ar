@@ -17,3 +17,8 @@ declare module "virtual:years" {
 	export const years: number[];
 	export const defaults: number[];
 }
+
+declare module "virtual:release" {
+	export const release: string;
+	export const year: number;
+}

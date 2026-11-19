@@ -13,6 +13,7 @@
 		expect,
 		hundredths,
 		leaves,
+		live,
 		type Meta,
 		micro,
 		type Node,
@@ -28,12 +29,18 @@
 		topics,
 		whole as every,
 	} from "./data";
+	import { release, year } from "virtual:release";
+	import { cite } from "./about/authors";
 	import { continents } from "./continents";
+	import { describe } from "./describe";
+	import Pick from "./Pick.svelte";
+	import { list, words as phrases } from "./poster/format";
 	import { words } from "./about/words";
 	import { country, flag } from "./flags";
 	import {
 		about as described,
 		apply,
+		outside,
 		plain,
 		save,
 		type Ssr,
@@ -41,8 +48,10 @@
 	} from "./page";
 	import {
 		years as bounds,
+		byKey,
 		means,
 		type Mean,
+		origin,
 		read as decode,
 		selection,
 		sorts,
@@ -238,6 +247,12 @@
 	const shelf = $derived.by(() => {
 		shelved = cells ?? shelved;
 		return shelve(cells ?? (broken ? [] : shelved), venues.id);
+	});
+
+	$effect(() => {
+		if (!cells) return;
+		const kept = live(shelf, s.flip);
+		if (kept.length < s.flip.length) s.flip = kept;
 	});
 
 	const bundles = $derived(
@@ -703,7 +718,8 @@
 			return picked(t, v) ? 2 : 0;
 		},
 		flip: (twig) => {
-			if (typeof twig.id === "string") s.flip = flipped(s.flip, twig.id);
+			if (typeof twig.id === "string")
+				s.flip = flipped(s.flip, twig.id).sort(byKey);
 			else if (twig.id) tier(twig.id);
 			else {
 				s.tiers = whole(tiers.map(mark)) === 2 ? [] : tiers;
@@ -1063,12 +1079,94 @@
 		}
 		making = false;
 	};
+
+	let citing = $state(false);
+	let citer: HTMLButtonElement | undefined = $state();
+	let copied = $state("");
+	let lapse: ReturnType<typeof setTimeout> | undefined;
+
+	const cited = (on: boolean) => {
+		clearTimeout(lapse);
+		copied = "";
+		citing = on;
+	};
+
+	const citation = $derived.by(() => {
+		if (!citing || blank || s.tab === "about") return undefined;
+		const venuing = s.tab === "venues";
+		const order = venuing
+			? s.by === "score"
+				? "Score"
+				: undefined
+			: s.sort === "excess"
+				? undefined
+				: sorts.find(([key]) => key === s.sort)?.[1];
+		const floors = (
+			venuing ? (["venues"] as const) : (["count", "authors"] as const)
+		)
+			.filter((key) => s.above.includes(key))
+			.map((key) => (key === "authors" ? "Authors" : "Count"));
+		const view = phrases([
+			[
+				`${venuing ? "Venue" : "Institution"} ranking for ${node.parent ? `the ${node.level} “${node.name}”` : node.name}`,
+			],
+			...describe(meta, node, s),
+			...(order ? [[`sorted by ${order}`]] : []),
+			...(floors.length ? [[`${list(floors)} above the mean`]] : []),
+		]).join(" ");
+		const address = `${origin}${url({ ...s, inst: undefined, author: undefined, venue: undefined, firm: undefined })}`;
+		const today = words.en.date(new Date());
+		const shown = [
+			`${cite.authors} (${year}). AllRankings, release ${release}. ${view}. `,
+			address,
+			` (accessed ${today})`,
+		];
+		const lines = [
+			["@misc{allrankings,"],
+			[`  author = {${cite.bibtex}},`],
+			["  title = {{AllRankings}},"],
+			[`  year = {${year}},`],
+			[`  note = {Release ${release}. ${tex(view)}. Accessed ${today}},`],
+			["  howpublished = {\\url{", address, "}}"],
+			["}"],
+		];
+		return {
+			shown,
+			lines,
+			text: shown.join(""),
+			bibtex: lines.map((line) => line.join("")).join("\n"),
+		};
+	});
+
+	const tie = (text: string) => text.replace(/(?<=\d) /g, "\u00a0");
+
+	const latex: Record<string, string> = {
+		"\\": "\\textbackslash{}",
+		"~": "\\textasciitilde{}",
+		"^": "\\textasciicircum{}",
+	};
+
+	const tex = (text: string) =>
+		text.replace(/[\\{}&%$#_~^]/g, (c) => latex[c] ?? `\\${c}`);
+
+	const copy = (key: string, text: string) =>
+		navigator.clipboard.writeText(text).then(() => {
+			clearTimeout(lapse);
+			copied = key;
+			lapse = setTimeout(() => (copied = ""), 1500);
+		});
 </script>
 
 <svelte:window
 	onpopstate={() => {
 		s = read();
 		placed = where(s);
+	}}
+	onkeydown={(event) => {
+		if (event.key !== "Escape" || !citing) return;
+		const inside = document.activeElement?.closest(".cite");
+		cited(false);
+		if (inside) citer?.focus();
 	}}
 />
 
@@ -1090,6 +1188,11 @@
 		><path fill="none" stroke="currentColor" stroke-width="1.5" {d} /></svg
 	>
 {/snippet}
+
+{#snippet breakable(text: string)}<span class="url"
+		>{#each text.split(/(?<=[,&?])|(?<=[^:/]\/)(?!\/)/) as part, k (k)}{#if k}<wbr
+				/>{/if}{part}{/each}</span
+	>{/snippet}
 
 {#snippet name(code: string, text: string)}
 	<span class="name">{@render badge(code)}{text}</span>
@@ -1195,6 +1298,54 @@
 				>
 			{:else}
 				<button
+					class="citer"
+					bind:this={citer}
+					aria-disabled={blank}
+					aria-haspopup="dialog"
+					aria-expanded={citing}
+					title="Cite"
+					aria-label="Cite"
+					onclick={() => cited(!blank && !citing)}
+					>{@render icon(
+						"M2.5 13V9.5c0-3.5 1.5-5.5 4-6M2.5 9.5H6V13H2.5M9.5 13V9.5c0-3.5 1.5-5.5 4-6M9.5 9.5H13V13H9.5",
+					)}</button
+				>
+				{#if citation}
+					<div
+						class="drop cite"
+						role="dialog"
+						aria-label="Cite"
+						use:outside={() => cited(false)}
+					>
+						<div class="code">
+							<p>
+								{tie(citation.shown[0])}{@render breakable(
+									citation.shown[1],
+								)}{tie(citation.shown[2])}
+							</p>
+							<button class="copy" onclick={() => copy("text", citation.text)}
+								>{copied === "text" ? words.en.copied : words.en.copy}</button
+							>
+						</div>
+						<div class="code">
+							<div class="lines">
+								{#each citation.lines as [head, address, tail], k (k)}
+									<div>
+										{tie(head)}{#if address}<wbr />{@render breakable(
+												address,
+											)}{tail}{/if}
+									</div>
+								{/each}
+							</div>
+							<button
+								class="copy"
+								onclick={() => copy("bibtex", citation.bibtex)}
+								>{copied === "bibtex" ? words.en.copied : words.en.copy}</button
+							>
+						</div>
+					</div>
+				{/if}
+				<button
 					aria-disabled={making || blank}
 					aria-busy={making}
 					title="Download poster"
@@ -1250,17 +1401,17 @@
 	<Panel trees={[areas, nations, shelves]}>
 		{#snippet tail()}
 			<span class="years">
-				<select bind:value={s.from} aria-label="From">
-					{#each tables.span(bounds[0], s.to) as year (year)}
-						<option value={year}>{year}</option>
-					{/each}
-				</select>
+				<Pick
+					bind:value={s.from}
+					years={tables.span(bounds[0], s.to)}
+					label="From"
+				/>
 				–
-				<select bind:value={s.to} aria-label="To">
-					{#each tables.span(s.from, bounds[1]) as year (year)}
-						<option value={year}>{year}</option>
-					{/each}
-				</select>
+				<Pick
+					bind:value={s.to}
+					years={tables.span(s.from, bounds[1])}
+					label="To"
+				/>
 			</span>
 		{/snippet}
 	</Panel>

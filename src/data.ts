@@ -339,26 +339,27 @@ export type Shelf = ReturnType<typeof shelve>;
 export const bundle = (v: number, years: number[]) =>
 	groups(`venue/${v}.parquet`, having({ year: years }));
 
+export const live = (shelf: Shelf, flip: Iterable<string>) =>
+	[...new Set(flip)].filter((key) => shelf.mass.has(key));
+
 export const swaps = (
 	shelf: Shelf,
 	flip: Iterable<string>,
 	chosen: Set<number>,
 	span: number[],
 ) =>
-	[...new Set(flip)]
-		.filter((key) => shelf.mass.has(key))
-		.map((key) => {
-			const [t, v] = shelf.mass.get(key) as [number, number, number];
-			return {
-				key: `venue/${v}. ${t}`,
-				sign: chosen.has(t) ? -1 : 1,
-				read: () =>
-					bundle(
-						v,
-						span.filter((year) => shelf.tier.get(slot(v, year)) === t),
-					),
-			};
-		});
+	live(shelf, flip).map((key) => {
+		const [t, v] = shelf.mass.get(key) as [number, number, number];
+		return {
+			key: `venue/${v}. ${t}`,
+			sign: chosen.has(t) ? -1 : 1,
+			read: () =>
+				bundle(
+					v,
+					span.filter((year) => shelf.tier.get(slot(v, year)) === t),
+				),
+		};
+	});
 
 export const count = (
 	counts: Group[][],

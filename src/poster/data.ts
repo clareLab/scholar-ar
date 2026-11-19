@@ -1,9 +1,9 @@
-import { continents } from "../continents";
 import {
 	count,
 	ends,
 	fit,
 	type Group,
+	live,
 	type Meta,
 	type Node,
 	shelve,
@@ -13,31 +13,18 @@ import {
 	topics,
 	whole,
 } from "../data";
+import { describe } from "../describe";
 import {
 	years as bounds,
 	defaults,
 	link,
 	origin,
 	type Selection,
+	tokens,
 } from "../state";
 import { lander, lands, listing, picker, rank, span, stock } from "../tables";
-import { nation } from "./format";
 
 const shortlist = 4;
-
-const places = (meta: Meta, at: string[]) => {
-	const present = new Set(lands(meta));
-	const picked = new Set(at);
-	const named: string[] = [];
-	const covered = new Set<string>();
-	for (const [name, codes] of continents) {
-		const here = codes.split(" ").filter((code) => present.has(code));
-		if (!here.length || !here.every((code) => picked.has(code))) continue;
-		named.push(name);
-		for (const code of here) covered.add(code);
-	}
-	return [...named, ...at.filter((code) => !covered.has(code)).map(nation)];
-};
 
 const slug = (text: string) =>
 	text
@@ -52,16 +39,15 @@ const address = (meta: Meta, node: Node, s: Selection) => {
 		`allrankings${node.id ? `-${node.id}` : ""}-${slug(node.name)}`,
 	];
 	const listed = (key: string, values: (string | number)[]) => {
-		stem.push(
-			`${key}-${values.length > 4 ? values.length : values.map((v) => slug(`${v}`)).join("-")}`,
-		);
+		stem.push(`${key}-${values.map((v) => slug(`${v}`)).join("-")}`);
 	};
 	if (s.from !== defaults[0] || s.to !== defaults[1])
 		stem.push(`${s.from}-${s.to}`);
 	if (s.tiers.join("") !== "1") stem.push(`t${s.tiers.join("")}`);
 	if (s.flip.length) listed("flip", s.flip);
 	if (s.off.length) listed("off", s.off);
-	if (s.at.length !== lands(meta).length) listed("in", s.at);
+	if (s.at.length !== lands(meta).length)
+		listed("in", tokens(s.at, lands(meta)));
 	return {
 		url: `${origin}${link(s, lands(meta))}`,
 		stem: stem.join("-"),
@@ -99,10 +85,13 @@ const credited = async (
 	return { sums, people, ...fit(sums, people) };
 };
 
-export const poster = async (meta: Meta, s: Selection) => {
+export const poster = async (meta: Meta, given: Selection) => {
 	const { nodes, institutions, venues } = meta;
-	const node = nodes.get(s.view) as Node;
-	const years = span(s.from, s.to);
+	const node = nodes.get(given.view) as Node;
+	const years = span(given.from, given.to);
+	const cells = await stalls(node, years, true);
+	const shelf = shelve(cells, venues.id);
+	const s = { ...given, flip: live(shelf, given.flip) };
 	const history = span(bounds[0], bounds[1]);
 	const chosen = new Set(s.tiers);
 	const flips = new Set(s.flip);
@@ -114,8 +103,6 @@ export const poster = async (meta: Meta, s: Selection) => {
 	const all = whole(node, off);
 	const empty = node.children.every((child) => off.has(child.id));
 
-	const cells = await stalls(node, years, true);
-	const shelf = shelve(cells, venues.id);
 	const past = shelve(
 		s.flip.length ? await stalls(node, history, true) : [],
 		venues.id,
@@ -334,7 +321,7 @@ export const poster = async (meta: Meta, s: Selection) => {
 			...s,
 			years,
 			at: every ? null : s.at,
-			places: every ? null : places(meta, s.at),
+			parts: describe(meta, node, s),
 		},
 		levels: {
 			child: node.children[0]?.level ?? null,
