@@ -1,6 +1,5 @@
 import { cap, type Font, measure, wrap } from "./fonts";
 import {
-	clean,
 	decade,
 	fixed,
 	hundredths,
@@ -120,7 +119,7 @@ export const ladderSpec = (data: Data, L: number, K: number, room: number) => {
 			L * 32,
 			Math.max(
 				measure("Institution", H, sansMedium),
-				...shown.map((i) => measure(clean(inst[i].name), L, condMedium)),
+				...shown.map((i) => measure(inst[i].name, L, condMedium)),
 			),
 		),
 	);
@@ -180,7 +179,7 @@ export const ladderSpec = (data: Data, L: number, K: number, room: number) => {
 	const lines = (i: number) => {
 		let got = cache.get(i);
 		if (!got) {
-			got = wrap(clean(inst[i].name), L, condMedium, nameW);
+			got = wrap(inst[i].name, L, condMedium, nameW);
 			cache.set(i, got);
 		}
 		return got;
@@ -1023,7 +1022,7 @@ export const plotFork = (
 		const s = labelSizes[Math.max(0, stepOf(d.count))];
 		const rank = row.excess > 0 ? whole(row.rankExcess) : "";
 		const rankW = rank ? measure(`${rank} `, s, sans) : 0;
-		const width = rankW + measure(clean(row.name), s, condMedium);
+		const width = rankW + measure(row.name, s, condMedium);
 		const asc = cap(s, condMedium) + 2;
 		const desc = s * 0.24;
 		const pad = Math.max(3, s * 0.15);
@@ -1295,7 +1294,7 @@ export const plotFork = (
 		labels.text(
 			p.x + rankW,
 			p.y,
-			clean(row.name),
+			row.name,
 			s,
 			condMedium,
 			ink,

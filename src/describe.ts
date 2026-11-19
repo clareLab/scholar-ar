@@ -1,6 +1,6 @@
 import type { Meta, Node } from "./data";
-import { list, nation, plural, plurals, venueName } from "./poster/format";
-import { grouped, type Selection } from "./state";
+import { list, nation, plural, plurals } from "./poster/format";
+import { defaults, grouped, type Selection, tokens } from "./state";
 import { collate, lands } from "./tables";
 
 export const places = (meta: Meta, at: string[]) => {
@@ -47,7 +47,7 @@ export const describe = (meta: Meta, node: Node, s: Selection) => {
 			return { tier, v: meta.venues.id.indexOf(id) };
 		})
 		.filter(({ v }) => v >= 0)
-		.map(({ tier, v }) => ({ tier, name: venueName(meta.venues.name[v]) }))
+		.map(({ tier, v }) => ({ tier, name: meta.venues.name[v] }))
 		.sort((a, b) => a.tier - b.tier || collate(a.name, b.name));
 	for (const [added, one, many] of [
 		[true, "listing added:", "listings added:"],
@@ -61,4 +61,38 @@ export const describe = (meta: Meta, node: Node, s: Selection) => {
 			]);
 	}
 	return parts;
+};
+
+const slug = (text: string) =>
+	text
+		.normalize("NFD")
+		.replace(/\p{M}/gu, "")
+		.toLowerCase()
+		.replace(/[^a-z0-9]+/g, "-")
+		.replace(/^-|-$/g, "");
+
+export const stem = (
+	meta: Meta,
+	node: Node,
+	s: Selection,
+	tab?: string,
+	tail: [string, string[]][] = [],
+) => {
+	const parts = [
+		`allrankings${node.id ? `-${node.id}` : ""}-${slug(node.name)}`,
+	];
+	if (tab) parts.push(tab);
+	if (s.from !== defaults[0] || s.to !== defaults[1])
+		parts.push(`${s.from}-${s.to}`);
+	if (s.tiers.join("") !== "1") parts.push(`t${s.tiers.join("")}`);
+	const every = s.at.length === lands(meta).length;
+	const lists: [string, string[]][] = [
+		["flip", s.flip],
+		["off", s.off.map(String)],
+		["in", every ? [] : tokens(s.at, lands(meta))],
+		...tail,
+	];
+	for (const [key, values] of lists)
+		if (values.length) parts.push(slug([key, ...values].join(" ")));
+	return parts.join("-");
 };

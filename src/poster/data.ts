@@ -13,46 +13,16 @@ import {
 	topics,
 	whole,
 } from "../data";
-import { describe } from "../describe";
-import {
-	years as bounds,
-	defaults,
-	link,
-	origin,
-	type Selection,
-	tokens,
-} from "../state";
+import { describe, stem } from "../describe";
+import { years as bounds, link, origin, type Selection } from "../state";
 import { lander, lands, listing, picker, rank, span, stock } from "../tables";
 
 const shortlist = 4;
 
-const slug = (text: string) =>
-	text
-		.normalize("NFD")
-		.replace(/\p{M}/gu, "")
-		.toLowerCase()
-		.replace(/[^a-z0-9]+/g, "-")
-		.replace(/^-|-$/g, "");
-
-const address = (meta: Meta, node: Node, s: Selection) => {
-	const stem = [
-		`allrankings${node.id ? `-${node.id}` : ""}-${slug(node.name)}`,
-	];
-	const listed = (key: string, values: (string | number)[]) => {
-		stem.push(`${key}-${values.map((v) => slug(`${v}`)).join("-")}`);
-	};
-	if (s.from !== defaults[0] || s.to !== defaults[1])
-		stem.push(`${s.from}-${s.to}`);
-	if (s.tiers.join("") !== "1") stem.push(`t${s.tiers.join("")}`);
-	if (s.flip.length) listed("flip", s.flip);
-	if (s.off.length) listed("off", s.off);
-	if (s.at.length !== lands(meta).length)
-		listed("in", tokens(s.at, lands(meta)));
-	return {
-		url: `${origin}${link(s, lands(meta))}`,
-		stem: stem.join("-"),
-	};
-};
+const address = (meta: Meta, node: Node, s: Selection) => ({
+	url: `${origin}${link(s, lands(meta))}`,
+	stem: stem(meta, node, s),
+});
 
 const bundles = (
 	shelf: ReturnType<typeof shelve>,

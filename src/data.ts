@@ -6,6 +6,7 @@ import {
 	parquetRead,
 } from "hyparquet";
 import { decompressZstd } from "hyparquet-compressors";
+import { clean, venueName } from "./poster/format";
 
 type Level = "all" | "domain" | "field" | "subfield" | "topic";
 
@@ -177,7 +178,7 @@ const grow = (tree: Tree) => {
 	const add = (level: Level, rows: (Branch | [number, string])[]) => {
 		for (const [id, name, up = 0] of rows) {
 			const parent = nodes.get(up) ?? root;
-			const node = { id, name, level, parent, children: [] };
+			const node = { id, name: clean(name), level, parent, children: [] };
 			parent.children.push(node);
 			nodes.set(id, node);
 		}
@@ -196,7 +197,11 @@ export const load = async (): Promise<Meta> => {
 		json<Venues>("venues.json"),
 	]);
 	if (!tree || !institutions || !venues) throw new Error(api);
-	return { nodes: grow(tree), institutions, venues };
+	return {
+		nodes: grow(tree),
+		institutions: { ...institutions, name: institutions.name.map(clean) },
+		venues: { ...venues, name: venues.name.map(venueName) },
+	};
 };
 
 export const leaves = <T extends { children: T[] }>(twig: T): T[] =>

@@ -1,5 +1,5 @@
 import { balance, cap, fit, measure } from "./fonts";
-import { clean, fixed, nation, percent, snap, whole } from "./format";
+import { fixed, nation, percent, snap, whole } from "./format";
 import type { Data, Derived, Institution } from "./model";
 import {
 	classBounds,
@@ -34,7 +34,6 @@ type Set = {
 const layout = (row: Institution, w: number, h: number): Set | undefined => {
 	const rank = whole(row.rankExcess);
 	const count = fixed(row.count);
-	const name_ = clean(row.name);
 	const pad = Math.max(3, Math.min(w, h) * 0.07);
 	for (const s of steps) {
 		if (s * 1.6 > h) continue;
@@ -42,7 +41,7 @@ const layout = (row: Institution, w: number, h: number): Set | undefined => {
 		const inset = Math.max(3, Math.round(es * 0.5));
 		if (2 * inset + measure(rank, es, sans) + es + measure(count, es, sans) > w)
 			continue;
-		const set = fit(name_, s, condMedium, w - 2 * pad, 5);
+		const set = fit(row.name, s, condMedium, w - 2 * pad, 5);
 		if (!set) continue;
 		const band = inset + cap(es, sans) + Math.max(2, Math.round(s * 0.3));
 		const lead = Math.round(s * 1.06);

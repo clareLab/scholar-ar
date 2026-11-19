@@ -1,5 +1,5 @@
 import { cap, fit, measure, wrap } from "./fonts";
-import { fixed, plural, scale, snap, venueName, whole } from "./format";
+import { fixed, plural, scale, snap, whole } from "./format";
 import type { Data, Derived } from "./model";
 import { grey, ink, paper, quiet, rule, tiers, tierText } from "./palette";
 import {
@@ -152,7 +152,7 @@ export const venuesBlock = (
 	for (const [i, v] of rows.entries()) {
 		const top = i < half;
 		const font = top ? condMedium : cond;
-		const lines = wrap(venueName(v.name), s, font, nameW);
+		const lines = wrap(v.name, s, font, nameW);
 		list.push({
 			height: p * lines.length,
 			draw: (scene, x, y) => {
@@ -277,7 +277,7 @@ export const venuesBlock = (
 				scene.rect(sx, sy, w, stripH, tiers[ti], paper, w > 3 ? 1.5 : 0);
 				run += v.count;
 				const rank = whole(v.rank);
-				const set = cellLabel(rank, venueName(v.name), w, stripH);
+				const set = cellLabel(rank, v.name, w, stripH);
 				const rs = set ? set.rs : 12;
 				const inset = Math.round(rs * 0.5);
 				if (set || 2 * inset + measure(rank, rs, sansMedium) <= w)

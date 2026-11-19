@@ -1,6 +1,5 @@
 import { cap, fit, measure, wrap } from "./fonts";
 import {
-	clean,
 	fixed,
 	percent,
 	plural,
@@ -191,7 +190,7 @@ export const childrenBlock = (
 	const groups: Group[] = [];
 	const headItem = (n: string, name: string, value?: string): Item => {
 		const lines = wrap(
-			clean(name),
+			name,
 			s,
 			condSemi,
 			(value ? leadCountX - countW - gap : width) - nameX,
@@ -215,7 +214,7 @@ export const childrenBlock = (
 				kind: 0,
 				head: headItem(`${j + 1}`, kid.name),
 				items: kid.grandchildren.map((g, i) => {
-					const lines = wrap(clean(g.name), s, cond, topicNameW);
+					const lines = wrap(g.name, s, cond, topicNameW);
 					return {
 						height: p * lines.length,
 						draw: (scene, x, y) => {
@@ -244,7 +243,7 @@ export const childrenBlock = (
 			kind: 1,
 			head: headItem(`${j + 1}`, kid.name, fixed(kid.count)),
 			items: kid.leaders.map((l) => {
-				const lines = wrap(clean(l.name), s, cond, leadNameW);
+				const lines = wrap(l.name, s, cond, leadNameW);
 				return {
 					height: p * lines.length,
 					draw: (scene, x, y) => {
@@ -283,7 +282,7 @@ export const childrenBlock = (
 					),
 			},
 			items: data.zero.map((z, i) => {
-				const lines = wrap(clean(z.name), s, cond, width - nameX);
+				const lines = wrap(z.name, s, cond, width - nameX);
 				return {
 					height: p * lines.length,
 					draw: (scene, x, y) => {
@@ -411,7 +410,7 @@ export const childrenBlock = (
 				const tw = Math.max(r.w - 2, 0);
 				const th = Math.max(r.h - 2, 0);
 				scene.rect(r.x, r.y, Math.max(tw, 0.5), Math.max(th, 0.5), tile);
-				const set = tileLabel(clean(g.name), tw, th);
+				const set = tileLabel(g.name, tw, th);
 				if (!set) continue;
 				const cxm = r.x + tw / 2;
 				const cym = r.y + th / 2;

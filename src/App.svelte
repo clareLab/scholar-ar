@@ -32,9 +32,9 @@
 	import { release, year } from "virtual:release";
 	import { cite } from "./about/authors";
 	import { continents } from "./continents";
-	import { describe } from "./describe";
+	import { describe, stem } from "./describe";
 	import Pick from "./Pick.svelte";
-	import { list, words as phrases } from "./poster/format";
+	import { clean, list, words as phrases } from "./poster/format";
 	import { words } from "./about/words";
 	import { country, flag } from "./flags";
 	import {
@@ -408,7 +408,7 @@
 				part<People>(roll, k, ["a", "name"]),
 			);
 			got?.a.forEach((id, j) => {
-				names.set(roster[k] + j, [id, got.name[j]]);
+				names.set(roster[k] + j, [id, clean(got.name[j])]);
 			});
 		}
 		return names;
@@ -1020,6 +1020,16 @@
 	});
 
 	const csv = () => {
+		const tail: [string, string[]][] =
+			s.tab === "institutions"
+				? [
+						["above", s.above.filter((key) => key !== "venues")],
+						["sort", s.sort === "excess" ? [] : [s.sort]],
+					]
+				: [
+						["above", s.above.filter((key) => key === "venues")],
+						["by", s.by === "count" ? [] : [s.by]],
+					];
 		const cell = (value: string | number) =>
 			/[",\n]/.test(`${value}`) ? `"${`${value}`.replace(/"/g, '""')}"` : value;
 		const lines =
@@ -1060,7 +1070,7 @@
 				[`\ufeff${lines.map((line) => line.map(cell).join(",")).join("\n")}\n`],
 				{ type: "text/csv" },
 			),
-			`allrankings-${node.level}-${node.id}-${s.tab}-${range}.csv`,
+			`${stem(meta, node, s, s.tab, tail)}.csv`,
 		);
 	};
 

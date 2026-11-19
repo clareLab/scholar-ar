@@ -15,6 +15,7 @@ const server = await serve(root, aboutPath);
 const site = await import("./src/data");
 const tables = await import("./src/tables");
 const { defaults, years: bounds } = await import("./src/state");
+const { clean } = await import("./src/poster/format");
 
 const selections: [number, number, number, number[], boolean, boolean][] = [
 	[0, 2022, 2025, [1], false, false],
@@ -277,7 +278,7 @@ for (const row of about.scaling.rows) {
 		about.scaling.top.forEach((want, k) => {
 			const got = top[k];
 			if (
-				got?.name !== want.name ||
+				got?.name !== clean(want.name) ||
 				!near(got.count / 1e6, want.count) ||
 				!near(got.authors / 1e6, want.authors) ||
 				!near(expected[got.i] / 1e6, want.expected) ||
@@ -373,7 +374,6 @@ for (const [view, from, to, tiers, flipping, unchecking] of selections) {
 
 const fonts = await import("./src/poster/fonts");
 const noto = await import("./src/poster/noto");
-const { clean } = await import("./src/poster/format");
 const font = (file: string) =>
 	Bun.file(`${import.meta.dir}/public/fonts/${file}`).arrayBuffer();
 await fonts.load(font);
