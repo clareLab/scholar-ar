@@ -1,5 +1,6 @@
 import katex from "katex";
 import MarkdownIt from "markdown-it";
+import { authors } from "./authors.ts";
 import type { Words } from "./words/index.ts";
 
 export type Section = { id: string; number: string; title: string };
@@ -12,7 +13,10 @@ export type Part = { head: string; blocks: Block[]; subs: Part[] };
 
 export type Paper = {
 	title: string;
+	authors: { name: string; email: string }[];
 	date: string;
+	issued: string;
+	pdf: string;
 	abstract: string;
 	sections: Section[];
 	lead: Block[];
@@ -208,9 +212,13 @@ export const paper = (text: string, words: Words): Paper => {
 		if (depth === "3" && tree.length) tree[tree.length - 1].subs.push(part);
 		else tree.push(part);
 	}
+	const now = new Date();
 	return {
 		title: meta.title ?? "",
-		date: words.date(new Date()),
+		authors,
+		date: words.date(now),
+		issued: `${now.getFullYear()}/${now.getMonth() + 1}/${now.getDate()}`,
+		pdf: words.pdf,
 		abstract: back(md.render(cite(meta.abstract ?? ""))),
 		sections,
 		lead: lead.startsWith("<h") ? [] : run(lead),

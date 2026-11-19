@@ -4,6 +4,7 @@ import { plugin } from "bun";
 import type { Component } from "svelte";
 import { compile } from "svelte/compiler";
 import { render } from "svelte/server";
+import { authors, cite } from "./authors";
 import type { Props } from "./plot";
 import { type About, resolve } from "./resolve";
 import { langs, words } from "./words";
@@ -33,6 +34,7 @@ const make = async (lang: (typeof langs)[number]) => {
 	const file = lang === "en" ? "about.md" : `about.${lang}.md`;
 	const text = resolve(await Bun.file(`${here}/${file}`).text(), about, lang, {
 		year: new Date().getFullYear(),
+		...cite,
 	});
 	const work = await mkdtemp(`${tmpdir()}/about-`);
 	const run = async (cmd: string[]) => {
@@ -59,6 +61,7 @@ const make = async (lang: (typeof langs)[number]) => {
 			await run(["rsvg-convert", "-f", "pdf", "-o", `${id}.pdf`, `${id}.svg`]);
 		}
 		await Bun.write(`${work}/paper.md`, text);
+		await Bun.write(`${work}/meta.json`, JSON.stringify({ authors }));
 		await run([
 			"pandoc",
 			"paper.md",
@@ -67,6 +70,7 @@ const make = async (lang: (typeof langs)[number]) => {
 			"--number-sections",
 			`--template=${here}/paper.tex`,
 			`--lua-filter=${here}/paper.lua`,
+			"--metadata-file=meta.json",
 			`--metadata=date:${say.date(new Date())}`,
 			`--metadata=release:${say.release(about.release)}`,
 			`--metadata=figure:${say.figure}`,

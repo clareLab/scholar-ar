@@ -11,6 +11,7 @@ export type Head = {
 	path: string;
 	about: boolean;
 	dataset?: string;
+	scholar?: { authors: string[]; date: string; pdf: string };
 };
 
 export type Ssr = {
@@ -105,13 +106,27 @@ export const view = (
 
 export const about = (
 	lang: Lang,
-	paper: { title: string; abstract: string },
+	paper: {
+		title: string;
+		abstract: string;
+		authors: { name: string }[];
+		issued: string;
+		pdf: string;
+	},
 ): Head => ({
 	lang: lang === "zh" ? "zh-Hans" : lang,
 	title: paper.title,
 	description: sentence(paper.abstract),
 	path: `/${lang}/about/`,
 	about: true,
+	scholar:
+		lang === "en"
+			? {
+					authors: paper.authors.map((author) => author.name),
+					date: paper.issued,
+					pdf: `${origin}/${paper.pdf}`,
+				}
+			: undefined,
 });
 
 export const quote = (text: string) =>
@@ -144,6 +159,15 @@ export const tags = (head: Head) => {
 			out.push(
 				`<link rel="alternate" hreflang="${hreflang}" href="${origin}/${lang}/about/" />`,
 			);
+	if (head.scholar)
+		out.push(
+			meta("name", "citation_title", head.title),
+			...head.scholar.authors.map((name) =>
+				meta("name", "citation_author", name),
+			),
+			meta("name", "citation_publication_date", head.scholar.date),
+			meta("name", "citation_pdf_url", head.scholar.pdf),
+		);
 	if (head.dataset)
 		out.push(
 			`<script type="application/ld+json">${JSON.stringify({
@@ -166,6 +190,7 @@ const managed = [
 	'link[rel="alternate"]',
 	'meta[property^="og:"]',
 	'meta[name="twitter:card"]',
+	'meta[name^="citation_"]',
 	'script[type="application/ld+json"]',
 ].join(", ");
 

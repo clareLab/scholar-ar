@@ -1,6 +1,5 @@
 ---
-title: AllRankings 如何运作
-author: clareLab
+title: AllRankings
 abstract: |
   AllRankings 在科学的每个范围里，按研究机构在该范围最强 venue 上发表的论文为机构排名。本文跟随一篇真实论文，逐步说明它如何变成网站上的数字。论文按其所引作品的主要主题分到各个范围。每个范围按 Open Scholar Ranking 分数为 venue 排序，这一分数来自 venue 之间的引用流。T1 由最强的那些 venue 组成，它们合计发表该范围约二十七分之一的论文。Count 累加机构在所选档和年份内论文上的分数署名，Authors 估计机构平均每年有多少人在该范围发表论文。表格按 Excess 为机构排名，Excess 等于机构的 Count 减去按其规模预期的 Count，预期值来自对整个范围拟合的 Authors 幂律。在检验的全部 {{validity.falls.views|int}} 个范围中，高一档的论文平均学科加权引用影响更高，也更常进入被引前 1%。在其中 {{validity.falls.top10|int}} 个范围中，高一档的论文也更常进入被引前 10%。这是分档具有实际意义的主要证据。
 ---
@@ -273,11 +272,11 @@ All 和各学科 T1 Count 的集中度，范围是 T1 Count 为正的机构。�
 
 排名随每次发布变化，引用时写明标题下方的版本号。引用网站上的具体排名时，再附上网址和访问日期，网址记录了当时的选择。
 
-clareLab ({{year|raw}}). AllRankings, release {{release|raw}}. <https://ar.clarelab.moe>
+{{authors|raw}} ({{year|raw}}). AllRankings, release {{release|raw}}. <https://ar.clarelab.moe>
 
 ```
 @misc{allrankings,
-  author = {clareLab},
+  author = {{{bibtex|raw}}},
   title = {{AllRankings}},
   year = {{{year|raw}}},
   note = {Release {{release|raw}}},

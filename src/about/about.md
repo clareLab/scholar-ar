@@ -1,6 +1,5 @@
 ---
-title: How AllRankings works
-author: clareLab
+title: AllRankings
 abstract: |
   AllRankings ranks research institutions in every area of science by their papers in the strongest venues of that area. This text follows one real paper through each step that turns it into the numbers on the site. The paper is split among areas by the primary topics of the works it cites. Each area orders its venues by their Open Scholar Ranking score, a measure built on citation flows between venues, and T1 holds the strongest venues, which together publish about a twenty-seventh of the area's papers. Count adds up an institution's fractional credit for the papers in the selected tiers and years, and Authors estimates how many of its people publish in the area in an average year. The table ranks institutions by Excess, their Count minus the Count expected at their size from a power law in Authors fitted to the whole area. In all {{validity.falls.views|int}} areas tested, papers in a higher tier have a higher mean field-weighted citation impact and are more often among the most cited 1%. They are more often among the most cited 10% in {{validity.falls.top10|int}} of the {{validity.falls.views|int}} areas. This is the main evidence that the tiers carry meaning.
 ---
@@ -273,11 +272,11 @@ Before each deploy a check runs the site's own data code in Bun against the loca
 
 Rankings change with each release, so a citation names the release shown under the title. A ranking taken from the site also gives its address, which records the selection, and the date it was read.
 
-clareLab ({{year|raw}}). AllRankings, release {{release|raw}}. <https://ar.clarelab.moe>
+{{authors|raw}} ({{year|raw}}). AllRankings, release {{release|raw}}. <https://ar.clarelab.moe>
 
 ```
 @misc{allrankings,
-  author = {clareLab},
+  author = {{{bibtex|raw}}},
   title = {{AllRankings}},
   year = {{{year|raw}}},
   note = {Release {{release|raw}}},

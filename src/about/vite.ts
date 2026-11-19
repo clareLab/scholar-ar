@@ -2,6 +2,7 @@ import { existsSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import type { Plugin } from "vite";
+import { cite } from "./authors.ts";
 import { paper } from "./render.ts";
 import { resolve } from "./resolve.ts";
 import { sentence } from "./sentence.ts";
@@ -45,7 +46,7 @@ export const about = (): Plugin => {
 			const json = await read();
 			if (!json) return "export default undefined";
 			const built = paper(
-				resolve(text, json, lang, { year: new Date().getFullYear() }),
+				resolve(text, json, lang, { year: new Date().getFullYear(), ...cite }),
 				words[lang],
 			);
 			if (match[2])

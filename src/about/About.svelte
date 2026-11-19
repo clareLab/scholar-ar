@@ -244,9 +244,9 @@
 	</div>
 	<header class="by">
 		<span
-			><span>clareLab</span><a href="mailto:yaho@clarelab.moe"
-				>yaho@clarelab.moe</a
-			></span
+			>{#each paper.authors as author}<span>{author.name}</span><a
+					href="mailto:{author.email}">{author.email}</a
+				>{/each}</span
 		>
 		<span
 			><span>{paper.date}</span><span>{say.release(about.release)}</span></span
