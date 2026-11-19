@@ -1,0 +1,3 @@
+User-agent: *
+Allow: /
+Sitemap: https://ar.clarelab.moe/sitemap.xml
